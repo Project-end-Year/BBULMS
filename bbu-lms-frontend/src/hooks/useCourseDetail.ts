@@ -35,6 +35,19 @@ export interface CourseOfferingSummary {
   updatedAt: string | null
 }
 
+export interface ClassScheduleItem {
+  id: number
+  courseOfferingId: number
+  dayOfWeek: string
+  startTime: string
+  endTime: string
+  room: string | null
+  type: string
+  isActive: boolean
+  createdAt: string | null
+  updatedAt: string | null
+}
+
 export interface CourseContext {
   role: 'admin' | 'lecturer' | 'student' | 'none'
   offeringId?: number
@@ -43,6 +56,7 @@ export interface CourseContext {
 export interface CourseDetailSummary {
   course: CourseSummary
   offerings: CourseOfferingSummary[]
+  classSchedules: ClassScheduleItem[]
   context: CourseContext
 }
 

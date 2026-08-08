@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\ApiResponse;
+use App\Http\Resources\ClassScheduleResource;
 use App\Http\Resources\CourseOfferingSummaryResource;
 use App\Http\Resources\CourseResource;
 use App\Http\Resources\DepartmentResource;
@@ -16,6 +17,7 @@ use App\Models\Semester;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -98,13 +100,7 @@ class CourseController extends Controller
      */
     public function show(Course $course)
     {
-        $user = $this->requireUser();
-
-        if (! $this->canAccessCourse($user, $course)) {
-            throw ValidationException::withMessages([
-                'course' => ['You do not have access to this course.'],
-            ]);
-        }
+        Gate::authorize('view', $course);
 
         $course->load(['department', 'program', 'offerings.semester', 'offerings.lecturer']);
 
@@ -118,24 +114,47 @@ class CourseController extends Controller
      */
     public function summary(Course $course)
     {
-        $user = $this->requireUser();
-
-        if (! $this->canAccessCourse($user, $course)) {
-            abort(403, 'You do not have access to this course.');
-        }
+        Gate::authorize('view', $course);
 
         $course->load(['department', 'program']);
 
         $offerings = $course->offerings()
-            ->with(['semester', 'lecturer'])
+            ->with(['semester', 'lecturer', 'classSchedules'])
             ->where('is_active', true)
             ->get();
+
+        $user = $this->requireUser();
 
         return ApiResponse::success([
             'course' => new CourseResource($course),
             'offerings' => CourseOfferingSummaryResource::collection($offerings),
+            'classSchedules' => $this->classSchedulesForOfferings($offerings),
             'context' => $this->summaryContext($user, $course, $offerings),
         ]);
+    }
+
+    /**
+     * Extract and sort active class schedules from a collection of offerings.
+     *
+     * @param \Illuminate\Support\Collection $offerings
+     */
+    private function classSchedulesForOfferings($offerings): array
+    {
+        $dayOrder = ['Mon' => 1, 'Tue' => 2, 'Wed' => 3, 'Thu' => 4, 'Fri' => 5, 'Sat' => 6, 'Sun' => 7];
+
+        $schedules = $offerings
+            ->pluck('classSchedules')
+            ->flatten()
+            ->where('is_active', true)
+            ->sortBy(function ($schedule) use ($dayOrder) {
+                return [
+                    $dayOrder[$schedule->day_of_week] ?? 8,
+                    $schedule->start_time,
+                ];
+            })
+            ->values();
+
+        return ClassScheduleResource::collection($schedules)->resolve();
     }
 
     /**
@@ -296,28 +315,6 @@ class CourseController extends Controller
         }
 
         return $query->whereRaw('1 = 0');
-    }
-
-    /**
-     * Determine whether the user can view a single course.
-     */
-    private function canAccessCourse(User $user, Course $course): bool
-    {
-        if ($user->hasRole('admin')) {
-            return true;
-        }
-
-        if ($user->hasRole('lecturer')) {
-            return $course->offerings()->where('lecturer_id', $user->id)->exists();
-        }
-
-        if ($user->hasRole('student')) {
-            return $course->offerings()->whereHas('enrollments', function ($q) use ($user) {
-                $q->where('student_id', $user->id)->where('status', 'enrolled');
-            })->exists();
-        }
-
-        return false;
     }
 
     /**

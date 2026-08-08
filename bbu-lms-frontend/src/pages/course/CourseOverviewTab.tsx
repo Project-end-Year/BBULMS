@@ -1,6 +1,6 @@
 import { BookOpen, CalendarDays, MapPin, Users, Clock, Award, Building2 } from 'lucide-react'
 
-import type { CourseDetailSummary, CourseOfferingSummary, Schedule } from '@/hooks/useCourseDetail'
+import type { CourseDetailSummary, CourseOfferingSummary, Schedule, ClassScheduleItem } from '@/hooks/useCourseDetail'
 
 interface CourseOverviewTabProps {
   data: CourseDetailSummary
@@ -11,8 +11,27 @@ function scheduleLabel(schedule: Schedule | null | undefined): string | null {
   return `${schedule.days.join(', ')} · ${schedule.start || '?'}–${schedule.end || '?'}`
 }
 
+const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function groupSchedulesByDay(schedules: ClassScheduleItem[]) {
+  const grouped = new Map<string, ClassScheduleItem[]>()
+
+  DAY_ORDER.forEach((day) => grouped.set(day, []))
+
+  schedules.forEach((schedule) => {
+    const list = grouped.get(schedule.dayOfWeek)
+    if (list) {
+      list.push(schedule)
+    }
+  })
+
+  grouped.forEach((list) => list.sort((a, b) => a.startTime.localeCompare(b.startTime)))
+
+  return DAY_ORDER.map((day) => ({ day, schedules: grouped.get(day) ?? [] }))
+}
+
 function CourseOverviewTab({ data }: CourseOverviewTabProps) {
-  const { course, offerings, context } = data
+  const { course, offerings, classSchedules, context } = data
 
   const primaryOffering: CourseOfferingSummary | undefined =
     context.offeringId != null
@@ -115,6 +134,58 @@ function CourseOverviewTab({ data }: CourseOverviewTabProps) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {classSchedules.length > 0 ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 text-lg font-semibold text-text">Weekly Schedule</h3>
+          <div className="divide-y divide-gray-100">
+            {groupSchedulesByDay(classSchedules).map(({ day, schedules }) =>
+              schedules.length > 0 ? (
+                <div key={day} className="py-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 text-bbu-blue" />
+                    <span className="text-sm font-semibold text-text">{day}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {schedules.map((schedule) => (
+                      <div
+                        key={schedule.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-gray-50 px-4 py-3 text-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5 text-text">
+                            <Clock className="h-4 w-4 text-text-muted" />
+                            <span className="font-medium">
+                              {schedule.startTime} – {schedule.endTime}
+                            </span>
+                          </div>
+                          {schedule.room && (
+                            <div className="flex items-center gap-1.5 text-text-muted">
+                              <MapPin className="h-4 w-4" />
+                              {schedule.room}
+                            </div>
+                          )}
+                        </div>
+                        <span className="rounded-full bg-bbu-blue/10 px-2 py-0.5 text-xs font-medium capitalize text-bbu-blue">
+                          {schedule.type}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
+          <CalendarDays className="mx-auto mb-3 h-10 w-10 text-text-muted" />
+          <h3 className="text-lg font-medium text-text">No Scheduled Sessions</h3>
+          <p className="mt-1 text-sm text-text-muted">
+            The weekly class schedule has not been published yet.
+          </p>
         </div>
       )}
 

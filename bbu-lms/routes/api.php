@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ClassScheduleController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\CourseOfferingController;
 use App\Http\Controllers\ProfileController;
@@ -30,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/my-courses', [CourseOfferingController::class, 'myCourses']);
     Route::get('/courses/{course}/summary', [CourseController::class, 'summary']);
+    Route::get('/courses/{course}/class-schedules', [ClassScheduleController::class, 'index']);
 
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::get('/users/form-meta', [UserController::class, 'formMeta']);
