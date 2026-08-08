@@ -18,6 +18,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RoleSeeder::class,
             DepartmentSeeder::class,
+            SemesterSeeder::class,
+            CourseSeeder::class,
         ]);
 
         $admin = User::firstOrCreate(

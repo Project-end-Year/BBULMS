@@ -2,13 +2,13 @@
 
 namespace Database\Factories;
 
-use App\Models\Semester;
+use App\Models\Enrollment;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<Semester>
+ * @extends Factory<Enrollment>
  */
-class SemesterFactory extends Factory
+class EnrollmentFactory extends Factory
 {
     /**
      * Define the model's default state.
@@ -17,12 +17,13 @@ class SemesterFactory extends Factory
      */
     public function definition(): array
     {
-        $start = fake()->date();
-
         return [
-            'name' => fake()->words(2, true),
-            'start_date' => $start,
-            'end_date' => fake()->dateTimeBetween($start, '+4 months')->format('Y-m-d'),
+            'course_offering_id' => null,
+            'student_id' => null,
+            'status' => 'enrolled',
+            'enrolled_at' => now(),
+            'dropped_at' => null,
+            'final_grade' => null,
             'is_active' => true,
         ];
     }

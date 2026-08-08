@@ -18,7 +18,11 @@ class DepartmentFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'code' => fake()->unique()->bothify('???'),
+            'name' => fake()->words(3, true),
+            'description' => fake()->sentence(),
+            'faculty_id' => null,
+            'is_active' => true,
         ];
     }
 }
