@@ -1,0 +1,34 @@
+# Backend
+bbu-lms/vendor/
+bbu-lms/node_modules/
+bbu-lms/.env
+bbu-lms/.env.testing
+bbu-lms/storage/*.key
+bbu-lms/storage/logs/
+bbu-lms/storage/framework/cache/
+bbu-lms/storage/framework/sessions/
+bbu-lms/storage/framework/views/
+bbu-lms/bootstrap/cache/*.php
+bbu-lms/public/hot
+bbu-lms/public/storage
+bbu-lms/database/database.sqlite
+bbu-lms/database/database.testing.sqlite
+bbu-lms/.phpunit.result.cache
+bbu-lms/Homestead.json
+bbu-lms/Homestead.yaml
+
+# Frontend
+bbu-lms-frontend/node_modules/
+bbu-lms-frontend/dist/
+bbu-lms-frontend/.env
+bbu-lms-frontend/.env.local
+bbu-lms-frontend/.env.*.local
+bbu-lms-frontend/*.log
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
