@@ -10,8 +10,10 @@ export interface User {
   phone?: string | null
   avatar?: string | null
   avatarUrl?: string | null
-  locale: string
+  locale: 'en' | 'km'
   isActive: boolean
+  createdAt?: string | null
+  updatedAt?: string | null
   roles: { id: number; name: string }[]
   department?: { id: number; code: string; name: string } | null
   studentProfile?: {

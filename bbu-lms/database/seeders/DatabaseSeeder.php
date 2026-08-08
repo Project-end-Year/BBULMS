@@ -20,12 +20,24 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
         ]);
 
-        User::firstOrCreate(
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@bbu.edu'],
+            [
+                'name' => 'Admin User',
+                'password' => bcrypt('password'),
+                'is_active' => true,
+            ]
+        );
+        $admin->syncRoles(['admin']);
+
+        $test = User::firstOrCreate(
             ['email' => 'test@example.com'],
             [
                 'name' => 'Test User',
                 'password' => bcrypt('password'),
+                'is_active' => true,
             ]
         );
+        $test->syncRoles(['student']);
     }
 }
