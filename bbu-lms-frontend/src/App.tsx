@@ -7,6 +7,8 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { RequireAuth, RequireRole } from '@/components/auth/RequireRole'
 import AppLayout from '@/layouts/AppLayout'
 import LoginPage from '@/pages/LoginPage'
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
+import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import DashboardPage from '@/pages/DashboardPage'
 import CoursesPage from '@/pages/CoursesPage'
 import ChatPage from '@/pages/ChatPage'
@@ -25,6 +27,8 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             <Route element={<RequireAuth />}>
               <Route element={<AppLayout />}>

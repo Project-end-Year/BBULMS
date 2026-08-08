@@ -25,6 +25,8 @@ bbu-lms-frontend/.env.local
 bbu-lms-frontend/.env.*.local
 bbu-lms-frontend/*.log
 
+.claude/
+
 # IDE / OS
 .idea/
 .vscode/

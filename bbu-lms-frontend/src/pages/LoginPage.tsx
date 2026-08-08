@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { GraduationCap, Loader2 } from 'lucide-react'
 
@@ -70,9 +70,17 @@ function LoginPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-text">
-              Password
-            </label>
+            <div className="mb-1 flex items-center justify-between">
+              <label htmlFor="password" className="text-sm font-medium text-text">
+                Password
+              </label>
+              <Link
+                to="/forgot-password"
+                className="text-xs font-medium text-bbu-blue hover:text-bbu-blue-dark"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <input
               id="password"
               type="password"
