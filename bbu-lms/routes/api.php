@@ -4,7 +4,9 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClassScheduleController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\CourseOfferingController;
+use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StudentSearchController;
 use App\Http\Controllers\UserController;
 use App\Http\Resources\ApiResponse;
 use Illuminate\Support\Facades\Route;
@@ -32,6 +34,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my-courses', [CourseOfferingController::class, 'myCourses']);
     Route::get('/courses/{course}/summary', [CourseController::class, 'summary']);
     Route::get('/courses/{course}/class-schedules', [ClassScheduleController::class, 'index']);
+
+    Route::get('/course-offerings/{offering}/enrollments', [EnrollmentController::class, 'index']);
+    Route::post('/course-offerings/{offering}/enrollments', [EnrollmentController::class, 'store']);
+    Route::delete('/course-offerings/{offering}/enrollments/{student}', [EnrollmentController::class, 'destroy']);
+
+    Route::get('/students/search', [StudentSearchController::class, '__invoke']);
 
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::get('/users/form-meta', [UserController::class, 'formMeta']);

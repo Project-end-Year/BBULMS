@@ -1,5 +1,18 @@
-import { BookOpen, CalendarDays, MapPin, Users, Clock, Award, Building2 } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  BookOpen,
+  CalendarDays,
+  MapPin,
+  Users,
+  Clock,
+  Award,
+  Building2,
+  UserPlus,
+  Loader2,
+} from 'lucide-react'
 
+import { useAuth } from '@/hooks/useAuth'
+import { useSelfEnroll } from '@/hooks/useEnrollments'
 import type { CourseDetailSummary, CourseOfferingSummary, Schedule, ClassScheduleItem } from '@/hooks/useCourseDetail'
 
 interface CourseOverviewTabProps {
@@ -32,14 +45,63 @@ function groupSchedulesByDay(schedules: ClassScheduleItem[]) {
 
 function CourseOverviewTab({ data }: CourseOverviewTabProps) {
   const { course, offerings, classSchedules, context } = data
+  const { user } = useAuth()
 
+  const isStudent = user?.roles.some((r) => r.name === 'student')
   const primaryOffering: CourseOfferingSummary | undefined =
     context.offeringId != null
       ? offerings.find((o) => o.id === context.offeringId)
       : offerings[0]
+  const targetOffering = primaryOffering
+  const selfEnroll = useSelfEnroll(isStudent ? targetOffering?.id : undefined)
+  const isStudentEnrolled = context.role === 'student' && context.offeringId != null
 
   return (
     <div className="space-y-6">
+      {isStudent && targetOffering && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          {isStudentEnrolled ? (
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-green-700">
+                <div className="h-2 w-2 rounded-full bg-green-500" />
+                <span className="font-medium">You are enrolled in this course.</span>
+              </div>
+              <span className="text-sm text-text-muted">{targetOffering.semester?.name}</span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="text-lg font-semibold text-text">Join this course</h3>
+                <p className="text-sm text-text-muted">
+                  Enroll in {targetOffering.semester?.name || 'this offering'}
+                  {targetOffering.section ? ` · Section ${targetOffering.section}` : ''}.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await selfEnroll.mutateAsync()
+                    toast.success('You have joined the course.')
+                  } catch (err: any) {
+                    toast.error(err?.message || 'Failed to join the course.')
+                  }
+                }}
+                disabled={selfEnroll.isPending}
+                className="inline-flex items-center gap-2 rounded-lg bg-bbu-blue px-4 py-2 text-sm font-medium text-white hover:bg-bbu-blue/90 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {selfEnroll.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <UserPlus className="h-4 w-4" />
+                )}
+                Join now
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>

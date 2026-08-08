@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Megaphone,
   MessageSquare,
+  UserPlus,
 } from 'lucide-react'
 
 import { useCourseDetail, type CourseDetailSummary } from '@/hooks/useCourseDetail'
@@ -22,6 +23,7 @@ import CourseAttendanceTab from '@/pages/course/CourseAttendanceTab'
 import CourseGradesTab from '@/pages/course/CourseGradesTab'
 import CourseAnnouncementsTab from '@/pages/course/CourseAnnouncementsTab'
 import CourseDiscussionTab from '@/pages/course/CourseDiscussionTab'
+import CourseEnrollmentTab from '@/pages/course/CourseEnrollmentTab'
 
 interface TabItem {
   key: string
@@ -32,6 +34,7 @@ interface TabItem {
 
 const tabs: TabItem[] = [
   { key: 'overview', label: 'Overview', icon: BookOpen, component: CourseOverviewTab },
+  { key: 'enrollment', label: 'Enrollment', icon: UserPlus, component: CourseEnrollmentTab },
   { key: 'materials', label: 'Materials', icon: FileText, component: CourseMaterialsTab },
   { key: 'assignments', label: 'Assignments', icon: ClipboardList, component: CourseAssignmentsTab },
   { key: 'quizzes', label: 'Quizzes', icon: HelpCircle, component: CourseQuizzesTab },
