@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\ApiResponse;
+use App\Http\Resources\CourseOfferingSummaryResource;
 use App\Http\Resources\CourseResource;
 use App\Http\Resources\DepartmentResource;
 use App\Http\Resources\ProgramResource;
@@ -108,6 +109,68 @@ class CourseController extends Controller
         $course->load(['department', 'program', 'offerings.semester', 'offerings.lecturer']);
 
         return ApiResponse::success(new CourseResource($course));
+    }
+
+    /**
+     * Return a course summary for the authenticated user.
+     *
+     * This endpoint is available to admins, the course lecturer, or enrolled students.
+     */
+    public function summary(Course $course)
+    {
+        $user = $this->requireUser();
+
+        if (! $this->canAccessCourse($user, $course)) {
+            abort(403, 'You do not have access to this course.');
+        }
+
+        $course->load(['department', 'program']);
+
+        $offerings = $course->offerings()
+            ->with(['semester', 'lecturer'])
+            ->where('is_active', true)
+            ->get();
+
+        return ApiResponse::success([
+            'course' => new CourseResource($course),
+            'offerings' => CourseOfferingSummaryResource::collection($offerings),
+            'context' => $this->summaryContext($user, $course, $offerings),
+        ]);
+    }
+
+    /**
+     * Build role context for the course summary.
+     */
+    private function summaryContext(User $user, Course $course, $offerings): array
+    {
+        if ($user->hasRole('admin')) {
+            return ['role' => 'admin'];
+        }
+
+        if ($user->hasRole('lecturer')) {
+            $offering = $offerings->firstWhere('lecturer_id', $user->id);
+
+            return [
+                'role' => 'lecturer',
+                'offeringId' => $offering?->id,
+            ];
+        }
+
+        if ($user->hasRole('student')) {
+            $offering = $offerings->first(function ($offering) use ($user) {
+                return $offering->enrollments()
+                    ->where('student_id', $user->id)
+                    ->where('status', 'enrolled')
+                    ->exists();
+            });
+
+            return [
+                'role' => 'student',
+                'offeringId' => $offering?->id,
+            ];
+        }
+
+        return ['role' => 'none'];
     }
 
     /**

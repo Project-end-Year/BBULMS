@@ -11,6 +11,7 @@ import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import DashboardPage from '@/pages/DashboardPage'
 import CoursesPage from '@/pages/CoursesPage'
+import CourseDetailPage from '@/pages/CourseDetailPage'
 import ChatPage from '@/pages/ChatPage'
 import CalendarPage from '@/pages/CalendarPage'
 import ProfilePage from '@/pages/ProfilePage'
@@ -35,6 +36,7 @@ function App() {
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/courses" element={<CoursesPage />} />
+                <Route path="/courses/:id" element={<CourseDetailPage />} />
                 <Route path="/chat" element={<ChatPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/profile" element={<ProfilePage />} />

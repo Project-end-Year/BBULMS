@@ -29,6 +29,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/profile/avatar', [ProfileController::class, 'uploadAvatar']);
 
     Route::get('/my-courses', [CourseOfferingController::class, 'myCourses']);
+    Route::get('/courses/{course}/summary', [CourseController::class, 'summary']);
 
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::get('/users/form-meta', [UserController::class, 'formMeta']);

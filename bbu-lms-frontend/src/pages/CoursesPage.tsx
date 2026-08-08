@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { BookOpen, Loader2, Users, CalendarDays, MapPin } from 'lucide-react'
 
 import { useAuth } from '@/hooks/useAuth'
@@ -38,9 +39,10 @@ function CoursesPage() {
             const schedule = scheduleLabel(offering.schedule)
 
             return (
-              <div
+              <Link
                 key={offering.id}
-                className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                to={`/courses/${course.id}`}
+                className="block rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
               >
                 <div className="mb-3 flex items-start justify-between">
                   <div>
@@ -109,7 +111,7 @@ function CoursesPage() {
                     </div>
                   </div>
                 )}
-              </div>
+              </Link>
             )
           })}
         </div>
