@@ -9,10 +9,25 @@ export interface User {
   email: string
   phone?: string | null
   avatar?: string | null
+  avatarUrl?: string | null
   locale: string
   isActive: boolean
   roles: { id: number; name: string }[]
   department?: { id: number; code: string; name: string } | null
+  studentProfile?: {
+    id: number
+    studentId: string
+    department?: { id: number; code: string; name: string } | null
+    major?: string | null
+    year?: number | null
+    semester?: { id: number; name: string } | null
+  } | null
+  lecturerProfile?: {
+    id: number
+    department?: { id: number; code: string; name: string } | null
+    title?: string | null
+    officeHours?: unknown[] | null
+  } | null
 }
 
 export interface LoginCredentials {

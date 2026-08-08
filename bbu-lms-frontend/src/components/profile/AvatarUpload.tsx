@@ -13,9 +13,7 @@ export function AvatarUpload() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
 
-  const avatarUrl = user?.avatar
-    ? `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/storage/${user.avatar}`
-    : null
+  const avatarUrl = user?.avatarUrl || null
 
   const handleClick = () => {
     inputRef.current?.click()

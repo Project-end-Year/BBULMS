@@ -11,6 +11,7 @@ import DashboardPage from '@/pages/DashboardPage'
 import CoursesPage from '@/pages/CoursesPage'
 import ChatPage from '@/pages/ChatPage'
 import CalendarPage from '@/pages/CalendarPage'
+import ProfilePage from '@/pages/ProfilePage'
 import AdminPage from '@/pages/AdminPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
 import AdminDepartmentsPage from '@/pages/admin/AdminDepartmentsPage'
@@ -32,6 +33,7 @@ function App() {
                 <Route path="/courses" element={<CoursesPage />} />
                 <Route path="/chat" element={<ChatPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
 
                 <Route element={<RequireRole role="admin" />}>
                   <Route path="/admin" element={<AdminPage />}>
