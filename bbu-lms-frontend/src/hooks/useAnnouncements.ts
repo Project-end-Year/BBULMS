@@ -2,9 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/axios'
 
+export type AnnouncementScope = 'course' | 'department' | 'university'
+
 export interface Announcement {
   id: number
-  courseId: number
+  courseId: number | null
+  scope: AnnouncementScope
+  departmentId: number | null
+  department: { id: number; code: string; name: string } | null
+  course: { id: number; code: string; name: string } | null
   title: string
   content: string
   postedBy: { id: number; name: string } | null
@@ -23,6 +29,8 @@ export interface AnnouncementsData {
 export interface AnnouncementFormData {
   title: string
   content: string
+  scope?: AnnouncementScope
+  departmentId?: number
   isPinned?: boolean
   isPublished?: boolean
 }
@@ -38,6 +46,17 @@ export function useAnnouncements(courseId: string | undefined) {
   })
 }
 
+export function useAllAnnouncements(scope?: AnnouncementScope) {
+  return useQuery<AnnouncementsData, Error>({
+    queryKey: ['all-announcements', scope],
+    queryFn: async () => {
+      const params = scope ? { scope } : undefined
+      const { data } = await api.get('/announcements', { params })
+      return data.data as AnnouncementsData
+    },
+  })
+}
+
 export function useCreateAnnouncement(courseId: string | undefined) {
   const queryClient = useQueryClient()
 
@@ -48,6 +67,7 @@ export function useCreateAnnouncement(courseId: string | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['course-announcements', courseId] })
+      queryClient.invalidateQueries({ queryKey: ['all-announcements'] })
     },
   })
 }
@@ -62,6 +82,7 @@ export function useUpdateAnnouncement(courseId: string | undefined, announcement
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['course-announcements', courseId] })
+      queryClient.invalidateQueries({ queryKey: ['all-announcements'] })
     },
   })
 }
@@ -75,6 +96,7 @@ export function useToggleAnnouncement(courseId: string | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['course-announcements', courseId] })
+      queryClient.invalidateQueries({ queryKey: ['all-announcements'] })
     },
   })
 }

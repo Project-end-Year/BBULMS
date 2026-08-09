@@ -7,6 +7,7 @@ import {
   MessageSquare,
   CalendarDays,
   Shield,
+  Megaphone,
   LogOut,
   Menu,
   X,
@@ -19,6 +20,7 @@ import {
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/courses', label: 'Courses', icon: BookOpen },
+  { to: '/announcements', label: 'Announcements', icon: Megaphone },
   { to: '/chat', label: 'Chat', icon: MessageSquare },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/admin', label: 'Admin', icon: Shield },

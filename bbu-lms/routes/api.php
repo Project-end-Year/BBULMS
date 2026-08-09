@@ -34,6 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/profile/avatar', [ProfileController::class, 'uploadAvatar']);
 
     Route::get('/my-courses', [CourseOfferingController::class, 'myCourses']);
+    Route::get('/announcements', [AnnouncementController::class, 'feed']);
     Route::get('/courses/{course}/summary', [CourseController::class, 'summary']);
     Route::get('/courses/{course}/class-schedules', [ClassScheduleController::class, 'index']);
     Route::get('/courses/{course}/announcements', [AnnouncementController::class, 'index']);

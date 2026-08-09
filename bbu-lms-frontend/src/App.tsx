@@ -14,6 +14,7 @@ import CoursesPage from '@/pages/CoursesPage'
 import CourseDetailPage from '@/pages/CourseDetailPage'
 import ChatPage from '@/pages/ChatPage'
 import CalendarPage from '@/pages/CalendarPage'
+import AnnouncementsPage from '@/pages/AnnouncementsPage'
 import ProfilePage from '@/pages/ProfilePage'
 import AdminPage from '@/pages/AdminPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
@@ -39,6 +40,7 @@ function App() {
                 <Route path="/courses/:id" element={<CourseDetailPage />} />
                 <Route path="/chat" element={<ChatPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/announcements" element={<AnnouncementsPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
 
                 <Route element={<RequireRole role="admin" />}>

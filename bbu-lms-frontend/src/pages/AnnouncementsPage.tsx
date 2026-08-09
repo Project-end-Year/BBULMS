@@ -10,12 +10,12 @@ import {
   Pin,
   Calendar,
   MegaphoneOff,
+  Filter,
 } from 'lucide-react'
 
 import { useAuth } from '@/hooks/useAuth'
-import { type CourseDetailSummary } from '@/hooks/useCourseDetail'
 import {
-  useAnnouncements,
+  useAllAnnouncements,
   useCreateAnnouncement,
   useUpdateAnnouncement,
   useToggleAnnouncement,
@@ -24,9 +24,12 @@ import {
   type AnnouncementScope,
 } from '@/hooks/useAnnouncements'
 
-interface CourseAnnouncementsTabProps {
-  data: CourseDetailSummary
-}
+const SCOPES: { value: AnnouncementScope | ''; label: string }[] = [
+  { value: '', label: 'All' },
+  { value: 'university', label: 'University-wide' },
+  { value: 'department', label: 'Department' },
+  { value: 'course', label: 'Course' },
+]
 
 function formatDate(value: string | null | undefined) {
   if (!value) return '-'
@@ -39,21 +42,38 @@ function formatDate(value: string | null | undefined) {
   })
 }
 
+function scopeBadge(scope: AnnouncementScope) {
+  const styles = {
+    university: 'bg-purple-100 text-purple-700',
+    department: 'bg-amber-100 text-amber-700',
+    course: 'bg-bbu-blue/10 text-bbu-blue',
+  }
+  const labels = {
+    university: 'University-wide',
+    department: 'Department',
+    course: 'Course',
+  }
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[scope]}`}>
+      {labels[scope]}
+    </span>
+  )
+}
+
 function AnnouncementModal({
   isOpen,
   onClose,
-  courseId,
   announcement,
-  canPostUniversity = false,
-  canPostDepartment = false,
 }: {
   isOpen: boolean
   onClose: () => void
-  courseId: string
   announcement?: Announcement
-  canPostUniversity?: boolean
-  canPostDepartment?: boolean
 }) {
+  const { user } = useAuth()
+  const isAdmin = user?.roles.some((r) => r.name === 'admin') ?? false
+  const isManager = isAdmin || (user?.roles.some((r) => r.name === 'lecturer') ?? false)
+  const canPostDepartment = isAdmin || user?.lecturerProfile?.department?.id != null
+
   const isEditing = Boolean(announcement)
   const [title, setTitle] = useState(announcement?.title ?? '')
   const [content, setContent] = useState(announcement?.content ?? '')
@@ -61,8 +81,14 @@ function AnnouncementModal({
   const [isPinned, setIsPinned] = useState(announcement?.isPinned ?? false)
   const [isPublished, setIsPublished] = useState(announcement?.isPublished ?? true)
 
-  const create = useCreateAnnouncement(courseId)
-  const update = useUpdateAnnouncement(courseId, announcement?.id)
+  // For scoped create we still need a course context because the API uses course routes.
+  // Admins can use course 1 as a management proxy; the scope field controls actual visibility.
+  const courseId = announcement?.courseId ? String(announcement.courseId) : '1'
+  const create = useCreateAnnouncement(isManager ? courseId : undefined)
+  const update = useUpdateAnnouncement(
+    announcement?.courseId ? String(announcement.courseId) : undefined,
+    announcement?.id
+  )
 
   if (!isOpen) return null
 
@@ -140,7 +166,7 @@ function AnnouncementModal({
             />
           </div>
 
-          {(canPostUniversity || canPostDepartment) && !isEditing && (
+          {!isEditing && (
             <div>
               <label className="mb-1 block text-sm font-medium text-text">Scope</label>
               <select
@@ -150,7 +176,7 @@ function AnnouncementModal({
               >
                 <option value="course">Course</option>
                 {canPostDepartment && <option value="department">Department</option>}
-                {canPostUniversity && <option value="university">University-wide</option>}
+                {isAdmin && <option value="university">University-wide</option>}
               </select>
             </div>
           )}
@@ -226,8 +252,11 @@ function AnnouncementCard({
           >
             {announcement.isPinned ? <Pin className="h-5 w-5" /> : <Megaphone className="h-5 w-5" />}
           </div>
-          <div>
-            <h4 className="font-semibold text-text">{announcement.title}</h4>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="font-semibold text-text">{announcement.title}</h4>
+              {scopeBadge(announcement.scope)}
+            </div>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
               {announcement.postedBy && <span>By {announcement.postedBy.name}</span>}
               <span className="flex items-center gap-1">
@@ -270,21 +299,19 @@ function AnnouncementCard({
   )
 }
 
-function CourseAnnouncementsTab({ data }: CourseAnnouncementsTabProps) {
+function AnnouncementsPage() {
   const { user } = useAuth()
-  const { course, context } = data
-
   const isAdmin = user?.roles.some((r) => r.name === 'admin') ?? false
-  const isManager = context.role === 'admin' || context.role === 'lecturer'
-  const canPostDepartment = isAdmin || user?.lecturerProfile?.department?.id != null
+  const isManager = isAdmin || (user?.roles.some((r) => r.name === 'lecturer') ?? false)
 
-  const { data: announcementsData, isLoading } = useAnnouncements(String(course.id))
-  const toggle = useToggleAnnouncement(String(course.id))
+  const [scopeFilter, setScopeFilter] = useState<AnnouncementScope | ''>('')
+  const { data, isLoading } = useAllAnnouncements(scopeFilter || undefined)
+  const toggle = useToggleAnnouncement('1')
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | undefined>(undefined)
 
-  const announcements = announcementsData?.announcements ?? []
+  const announcements = data?.announcements ?? []
 
   const handleEdit = (announcement: Announcement) => {
     setEditingAnnouncement(announcement)
@@ -317,7 +344,7 @@ function CourseAnnouncementsTab({ data }: CourseAnnouncementsTabProps) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <Megaphone className="h-5 w-5 text-bbu-blue" />
-          <h2 className="text-lg font-semibold text-text">Announcements</h2>
+          <h2 className="text-lg font-semibold text-text">All Announcements</h2>
         </div>
 
         {isManager && (
@@ -330,6 +357,21 @@ function CourseAnnouncementsTab({ data }: CourseAnnouncementsTabProps) {
             New Announcement
           </button>
         )}
+      </div>
+
+      <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <Filter className="h-4 w-4 text-text-muted" />
+        <select
+          value={scopeFilter}
+          onChange={(e) => setScopeFilter(e.target.value as AnnouncementScope | '')}
+          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-bbu-blue focus:outline-none focus:ring-2 focus:ring-bbu-blue/20"
+        >
+          {SCOPES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {isLoading ? (
@@ -351,11 +393,11 @@ function CourseAnnouncementsTab({ data }: CourseAnnouncementsTabProps) {
       ) : (
         <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
           <MegaphoneOff className="mx-auto mb-3 h-10 w-10 text-text-muted" />
-          <h3 className="text-lg font-medium text-text">No Announcements Yet</h3>
+          <h3 className="text-lg font-medium text-text">No Announcements</h3>
           <p className="mt-1 max-w-sm text-sm text-text-muted">
             {isManager
-              ? 'Post updates, reminders, and important news for this course.'
-              : 'Check back later for announcements from your lecturer.'}
+              ? 'Post university, department, or course announcements from here.'
+              : 'There are no announcements for you right now.'}
           </p>
         </div>
       )}
@@ -363,13 +405,10 @@ function CourseAnnouncementsTab({ data }: CourseAnnouncementsTabProps) {
       <AnnouncementModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        courseId={String(course.id)}
         announcement={editingAnnouncement}
-        canPostUniversity={isAdmin}
-        canPostDepartment={canPostDepartment}
       />
     </div>
   )
 }
 
-export default CourseAnnouncementsTab
+export default AnnouncementsPage

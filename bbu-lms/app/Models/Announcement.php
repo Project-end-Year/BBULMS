@@ -13,6 +13,8 @@ class Announcement extends Model
 
     protected $fillable = [
         'course_id',
+        'scope',
+        'department_id',
         'title',
         'content',
         'posted_by',
@@ -32,6 +34,11 @@ class Announcement extends Model
     public function course(): BelongsTo
     {
         return $this->belongsTo(Course::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
     }
 
     public function poster(): BelongsTo

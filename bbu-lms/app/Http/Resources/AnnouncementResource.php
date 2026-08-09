@@ -17,6 +17,18 @@ class AnnouncementResource extends JsonResource
         return [
             'id' => $this->id,
             'courseId' => $this->course_id,
+            'scope' => $this->scope,
+            'departmentId' => $this->department_id,
+            'department' => $this->whenLoaded('department', fn () => [
+                'id' => $this->department->id,
+                'code' => $this->department->code,
+                'name' => $this->department->name,
+            ]),
+            'course' => $this->whenLoaded('course', fn () => [
+                'id' => $this->course->id,
+                'code' => $this->course->code,
+                'name' => $this->course->name,
+            ]),
             'title' => $this->title,
             'content' => $this->content,
             'postedBy' => new UserResource($this->whenLoaded('poster')),

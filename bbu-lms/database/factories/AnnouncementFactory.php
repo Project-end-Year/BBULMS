@@ -19,6 +19,8 @@ class AnnouncementFactory extends Factory
     {
         return [
             'course_id' => null,
+            'scope' => 'course',
+            'department_id' => null,
             'title' => fake()->sentence(6),
             'content' => fake()->paragraphs(2, true),
             'posted_by' => null,

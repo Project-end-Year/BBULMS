@@ -6,14 +6,68 @@ use App\Http\Resources\AnnouncementResource;
 use App\Http\Resources\ApiResponse;
 use App\Models\Announcement;
 use App\Models\Course;
+use App\Models\CourseOffering;
+use App\Models\Department;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AnnouncementController extends Controller
 {
+    private const SCOPES = ['course', 'department', 'university'];
+
+    /**
+     * List all announcements relevant to the authenticated user.
+     */
+    public function feed(Request $request)
+    {
+        $user = $this->requireUser();
+
+        $scopeFilter = $request->input('scope');
+        $query = Announcement::query()
+            ->with(['poster', 'course', 'department'])
+            ->where('is_active', true)
+            ->where('is_published', true);
+
+        if ($scopeFilter && in_array($scopeFilter, self::SCOPES, true)) {
+            $query->where('scope', $scopeFilter);
+        }
+
+        $query->where(function ($q) use ($user) {
+            // University-wide announcements are visible to all authenticated users.
+            $q->where('scope', 'university');
+
+            // Department-wide announcements for the user's department.
+            $departmentId = $this->userDepartmentId($user);
+            if ($departmentId) {
+                $q->orWhere(function ($deptQ) use ($departmentId) {
+                    $deptQ->where('scope', 'department')->where('department_id', $departmentId);
+                });
+            }
+
+            // Course-level announcements for courses the user teaches or is enrolled in.
+            $courseIds = $this->accessibleCourseIds($user);
+            if (! empty($courseIds)) {
+                $q->orWhere(function ($courseQ) use ($courseIds) {
+                    $courseQ->where('scope', 'course')->whereIn('course_id', $courseIds);
+                });
+            }
+        });
+
+        $announcements = $query
+            ->orderByDesc('is_pinned')
+            ->orderByDesc('published_at')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return ApiResponse::success([
+            'announcements' => AnnouncementResource::collection($announcements),
+        ]);
+    }
+
     /**
      * List announcements for a course.
      */
@@ -25,8 +79,9 @@ class AnnouncementController extends Controller
         $isManager = $user instanceof User && $this->canManageCourse($user, $course);
 
         $query = $course->announcements()
-            ->with('poster')
-            ->where('is_active', true);
+            ->with(['poster', 'department'])
+            ->where('is_active', true)
+            ->where('scope', 'course');
 
         if (! $isManager) {
             $query->where('is_published', true);
@@ -57,13 +112,21 @@ class AnnouncementController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'content' => ['required', 'string'],
+            'scope' => ['required', 'string', Rule::in(self::SCOPES)],
+            'departmentId' => ['nullable', 'integer', 'exists:departments,id'],
             'isPinned' => ['nullable', 'boolean'],
             'isPublished' => ['nullable', 'boolean'],
         ]);
 
+        $scope = $validated['scope'];
+        $this->validateScope($user, $scope, $validated['departmentId'] ?? null, $course);
+
         $isPublished = $validated['isPublished'] ?? true;
 
-        $announcement = $course->announcements()->create([
+        $announcement = Announcement::create([
+            'course_id' => $scope === 'course' ? $course->id : null,
+            'scope' => $scope,
+            'department_id' => $scope === 'department' ? $validated['departmentId'] : null,
             'title' => $validated['title'],
             'content' => $validated['content'],
             'posted_by' => $user->id,
@@ -73,8 +136,13 @@ class AnnouncementController extends Controller
             'is_active' => true,
         ]);
 
+        // Ensure course_id is nullable in storage for non-course scopes.
+        if ($scope !== 'course' && $announcement->course_id !== null) {
+            $announcement->update(['course_id' => null]);
+        }
+
         return ApiResponse::success(
-            new AnnouncementResource($announcement->load('poster')),
+            new AnnouncementResource($announcement->load(['poster', 'course', 'department'])),
             'Announcement created successfully.',
             201
         );
@@ -98,14 +166,22 @@ class AnnouncementController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'content' => ['required', 'string'],
+            'scope' => ['required', 'string', Rule::in(self::SCOPES)],
+            'departmentId' => ['nullable', 'integer', 'exists:departments,id'],
             'isPinned' => ['nullable', 'boolean'],
             'isPublished' => ['nullable', 'boolean'],
         ]);
+
+        $scope = $validated['scope'];
+        $this->validateScope($user, $scope, $validated['departmentId'] ?? null, $course);
 
         $wasPublished = $announcement->is_published;
         $isPublished = $validated['isPublished'] ?? $wasPublished;
 
         $announcement->update([
+            'course_id' => $scope === 'course' ? $course->id : null,
+            'scope' => $scope,
+            'department_id' => $scope === 'department' ? $validated['departmentId'] : null,
             'title' => $validated['title'],
             'content' => $validated['content'],
             'is_pinned' => $validated['isPinned'] ?? $announcement->is_pinned,
@@ -114,7 +190,7 @@ class AnnouncementController extends Controller
         ]);
 
         return ApiResponse::success(
-            new AnnouncementResource($announcement->load('poster')),
+            new AnnouncementResource($announcement->load(['poster', 'course', 'department'])),
             'Announcement updated successfully.'
         );
     }
@@ -139,9 +215,42 @@ class AnnouncementController extends Controller
         $status = $announcement->is_active ? 'activated' : 'deactivated';
 
         return ApiResponse::success(
-            new AnnouncementResource($announcement->load('poster')),
+            new AnnouncementResource($announcement->load(['poster', 'course', 'department'])),
             "Announcement {$status} successfully."
         );
+    }
+
+    /**
+     * Validate scope permissions and required fields.
+     */
+    private function validateScope(User $user, string $scope, ?int $departmentId, Course $course): void
+    {
+        if ($scope === 'university') {
+            if (! $user->hasRole('admin')) {
+                abort(403, 'Only administrators can post university-wide announcements.');
+            }
+
+            return;
+        }
+
+        if ($scope === 'department') {
+            if (! $departmentId) {
+                throw ValidationException::withMessages([
+                    'departmentId' => ['A department is required for department-wide announcements.'],
+                ]);
+            }
+
+            if (! $user->hasRole('admin')) {
+                $userDepartmentId = $this->userDepartmentId($user);
+                if ($userDepartmentId !== $departmentId) {
+                    abort(403, 'You can only post announcements for your own department.');
+                }
+            }
+
+            return;
+        }
+
+        // course scope: already checked by canManageCourse
     }
 
     /**
@@ -154,6 +263,47 @@ class AnnouncementController extends Controller
         }
 
         return $user->hasRole('lecturer') && $course->offerings()->where('lecturer_id', $user->id)->exists();
+    }
+
+    /**
+     * Get the user's department ID from their profile.
+     */
+    private function userDepartmentId(User $user): ?int
+    {
+        if ($user->studentProfile) {
+            return $user->studentProfile->department_id;
+        }
+
+        if ($user->lecturerProfile) {
+            return $user->lecturerProfile->department_id;
+        }
+
+        return $user->department_id;
+    }
+
+    /**
+     * Get course IDs the user can access (teaches or enrolled in).
+     */
+    private function accessibleCourseIds(User $user): array
+    {
+        if ($user->hasRole('admin')) {
+            return Course::pluck('id')->toArray();
+        }
+
+        $ids = collect();
+
+        if ($user->hasRole('lecturer')) {
+            $ids = $ids->merge($user->taughtOfferings()->pluck('course_id'));
+        }
+
+        if ($user->hasRole('student')) {
+            $enrolledOfferingIds = $user->enrollments()
+                ->where('status', 'enrolled')
+                ->pluck('course_offering_id');
+            $ids = $ids->merge(CourseOffering::whereIn('id', $enrolledOfferingIds)->pluck('course_id'));
+        }
+
+        return $ids->filter()->unique()->values()->toArray();
     }
 
     /**
