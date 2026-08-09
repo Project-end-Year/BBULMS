@@ -15,6 +15,8 @@ import {
   ChevronDown,
   ChevronUp,
   Files,
+  PlayCircle,
+  FileSearch,
 } from 'lucide-react'
 
 import { type CourseOfferingSummary, type CourseDetailSummary } from '@/hooks/useCourseDetail'
@@ -26,9 +28,11 @@ import {
   useDownloadMaterial,
   useTrackMaterialView,
   useCourseMaterialTracking,
+  usePreviewMaterial,
   formatFileSize,
   type CourseMaterial,
   type MaterialFormData,
+  type PreviewData,
 } from '@/hooks/useCourseMaterials'
 
 interface CourseMaterialsTabProps {
@@ -256,14 +260,14 @@ function MaterialCard({
   onEdit,
   onToggle,
   onDownload,
-  trackView,
+  onPreview,
 }: {
   material: CourseMaterial
   isManager: boolean
   onEdit: (material: CourseMaterial) => void
   onToggle: (material: CourseMaterial) => void
   onDownload: (material: CourseMaterial) => void
-  trackView: (id: number) => void
+  onPreview: (material: CourseMaterial) => void
 }) {
   const Icon = getFileIcon(material.type)
   const isFile = material.type === 'file'
@@ -271,10 +275,9 @@ function MaterialCard({
 
   const handlePrimaryAction = () => {
     if (isFile) {
-      onDownload(material)
+      onPreview(material)
     } else if (isLink && material.externalUrl) {
-      trackView(material.id)
-      window.open(material.externalUrl, '_blank')
+      onPreview(material)
     }
   }
 
@@ -323,9 +326,20 @@ function MaterialCard({
           onClick={handlePrimaryAction}
           className="inline-flex items-center gap-1.5 rounded-lg bg-bbu-blue px-3 py-2 text-sm font-medium text-white hover:bg-bbu-blue/90"
         >
-          {isFile ? <Download className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
-          {isFile ? 'Download' : 'Open'}
+          {isFile ? <FileSearch className="h-4 w-4" /> : material.type === 'video' ? <PlayCircle className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
+          {isFile ? 'Preview' : material.type === 'video' ? 'Watch' : 'Open'}
         </button>
+
+        {isFile && (
+          <button
+            type="button"
+            onClick={() => onDownload(material)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-text hover:bg-gray-50"
+          >
+            <Download className="h-4 w-4" />
+            Download
+          </button>
+        )}
 
         {isManager && (
           <>
@@ -356,6 +370,153 @@ function MaterialCard({
   )
 }
 
+function PreviewModal({
+  preview,
+  material,
+  onClose,
+}: {
+  preview: PreviewData | null
+  material: CourseMaterial | null
+  onClose: () => void
+}) {
+  if (!preview || !material) return null
+
+  const isPdf = material.mimeType === 'application/pdf'
+  const isImage = material.mimeType?.startsWith('image/')
+  const isVideoFile = material.mimeType?.startsWith('video/')
+  const isVideoLink = preview.type === 'video'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="flex h-[90vh] w-full max-w-5xl flex-col rounded-xl border border-gray-200 bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-gray-200 p-4">
+          <div>
+            <h3 className="font-semibold text-text">{material.title}</h3>
+            <p className="text-xs text-text-muted">
+              {material.fileName || material.externalUrl || 'Material preview'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {preview.url && (
+              <a
+                href={preview.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-text hover:bg-gray-50"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open in new tab
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded p-1 text-text-muted hover:bg-gray-100"
+              aria-label="Close preview"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto bg-gray-50 p-4">
+          {isPdf ? (
+            preview.url ? (
+              <iframe
+                src={preview.url}
+                title={material.title}
+                className="h-full w-full rounded-lg border border-gray-200 bg-white"
+              />
+            ) : (
+              <p className="text-center text-text-muted">No preview URL available.</p>
+            )
+          ) : isImage ? (
+            preview.url ? (
+              <img
+                src={preview.url}
+                alt={material.title}
+                className="mx-auto max-h-full rounded-lg border border-gray-200 shadow-sm"
+              />
+            ) : null
+          ) : isVideoFile ? (
+            preview.url ? (
+              <video controls className="mx-auto max-h-full rounded-lg border border-gray-200 shadow-sm">
+                <source src={preview.url} type={material.mimeType || undefined} />
+                Your browser does not support the video tag.
+              </video>
+            ) : null
+          ) : isVideoLink ? (
+            preview.url ? (
+              <div className="mx-auto aspect-video w-full max-w-3xl rounded-lg border border-gray-200 bg-black">
+                <iframe
+                  src={getEmbedUrl(preview.url) || preview.url}
+                  title={material.title}
+                  className="h-full w-full rounded-lg"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            ) : null
+          ) : preview.type === 'link' ? (
+            <div className="mx-auto max-w-xl rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
+              <ExternalLink className="mx-auto mb-3 h-10 w-10 text-bbu-blue" />
+              <h3 className="text-lg font-semibold text-text">External Link</h3>
+              <p className="mt-2 break-all text-sm text-text-muted">{preview.url}</p>
+              {preview.url && (
+                <a
+                  href={preview.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-bbu-blue px-4 py-2 text-sm font-medium text-white hover:bg-bbu-blue/90"
+                >
+                  Visit link
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              )}
+            </div>
+          ) : (
+            <div className="mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
+              <FileText className="mx-auto mb-3 h-10 w-10 text-text-muted" />
+              <h3 className="text-lg font-medium text-text">No inline preview</h3>
+              <p className="mt-1 text-sm text-text-muted">This file type cannot be previewed inline. Download it instead.</p>
+              {preview.url && (
+                <a
+                  href={preview.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-bbu-blue px-4 py-2 text-sm font-medium text-white hover:bg-bbu-blue/90"
+                >
+                  <Download className="h-4 w-4" />
+                  Open file
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function getEmbedUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    if (parsed.hostname.includes('youtube.com') || parsed.hostname.includes('youtu.be')) {
+      const videoId = parsed.hostname.includes('youtu.be')
+        ? parsed.pathname.slice(1)
+        : parsed.searchParams.get('v')
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`
+    }
+    if (parsed.hostname.includes('vimeo.com')) {
+      const match = parsed.pathname.match(/\/(\d+)/)
+      if (match) return `https://player.vimeo.com/video/${match[1]}`
+    }
+  } catch {
+    // ignore invalid URLs
+  }
+  return null
+}
+
 function CourseMaterialsTab({ data }: CourseMaterialsTabProps) {
   const { offerings, context } = data
 
@@ -376,9 +537,12 @@ function CourseMaterialsTab({ data }: CourseMaterialsTabProps) {
   const toggle = useToggleMaterial(offeringId)
   const { download } = useDownloadMaterial()
   const trackView = useTrackMaterialView()
+  const previewMutation = usePreviewMaterial()
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingMaterial, setEditingMaterial] = useState<CourseMaterial | undefined>(undefined)
+  const [previewMaterial, setPreviewMaterial] = useState<CourseMaterial | null>(null)
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null)
   const [showTracking, setShowTracking] = useState(false)
 
   const materials = materialsData?.materials ?? []
@@ -407,6 +571,21 @@ function CourseMaterialsTab({ data }: CourseMaterialsTabProps) {
   const handleDownload = (material: CourseMaterial) => {
     trackView.mutate(material.id)
     download(material)
+  }
+
+  const handlePreview = async (material: CourseMaterial) => {
+    try {
+      const data = await previewMutation.mutateAsync(material)
+      setPreviewMaterial(material)
+      setPreviewData(data)
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to load preview.')
+    }
+  }
+
+  const handleClosePreview = () => {
+    setPreviewMaterial(null)
+    setPreviewData(null)
   }
 
   const tracking = trackingData?.tracking ?? []
@@ -471,7 +650,7 @@ function CourseMaterialsTab({ data }: CourseMaterialsTabProps) {
               onEdit={handleEdit}
               onToggle={handleToggle}
               onDownload={handleDownload}
-              trackView={(id) => trackView.mutate(id)}
+              onPreview={handlePreview}
             />
           ))}
         </div>
@@ -559,6 +738,8 @@ function CourseMaterialsTab({ data }: CourseMaterialsTabProps) {
         offeringId={offeringId ?? 0}
         material={editingMaterial}
       />
+
+      <PreviewModal preview={previewData} material={previewMaterial} onClose={handleClosePreview} />
     </div>
   )
 }

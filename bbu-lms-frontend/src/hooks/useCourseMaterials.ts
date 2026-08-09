@@ -117,6 +117,23 @@ export function useDownloadMaterial() {
   }
 }
 
+export interface PreviewData {
+  type: MaterialType
+  url: string | null
+}
+
+export function usePreviewMaterial() {
+  return useMutation<PreviewData, Error, CourseMaterial>({
+    mutationFn: async (material) => {
+      if (material.type === 'file') {
+        return { type: material.type, url: `${api.defaults.baseURL}/course-materials/${material.id}/preview` }
+      }
+      await api.get(`/course-materials/${material.id}/preview`)
+      return { type: material.type, url: material.externalUrl }
+    },
+  })
+}
+
 export function useTrackMaterialView() {
   return useMutation<void, Error, number>({
     mutationFn: async (materialId) => {

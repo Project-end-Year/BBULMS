@@ -402,4 +402,79 @@ class CourseMaterialTest extends TestCase
         $response->assertOk()
             ->assertJsonCount(0, 'data.materials');
     }
+
+    public function test_student_can_preview_file_inline(): void
+    {
+        Storage::fake('public');
+        $admin = $this->admin();
+        $student = User::factory()->create();
+        $student->syncRoles(['student']);
+        $offering = $this->createOffering();
+        Enrollment::factory()->create([
+            'course_offering_id' => $offering->id,
+            'student_id' => $student->id,
+            'status' => 'enrolled',
+        ]);
+
+        $file = UploadedFile::fake()->create('slides.pdf', 100, 'application/pdf');
+
+        $upload = $this->actingAs($admin)->postJson("/api/course-offerings/{$offering->id}/materials", [
+            'title' => 'Slides',
+            'type' => 'file',
+            'file' => $file,
+        ]);
+
+        $materialId = $upload->json('data.id');
+
+        $response = $this->actingAs($student)->getJson("/api/course-materials/{$materialId}/preview");
+
+        $response->assertOk()
+            ->assertHeader('Content-Disposition', 'inline; filename="slides.pdf"');
+
+        $this->assertDatabaseHas('course_material_views', [
+            'course_material_id' => $materialId,
+            'student_id' => $student->id,
+            'action' => 'view',
+        ]);
+    }
+
+    public function test_preview_for_link_returns_url(): void
+    {
+        $student = User::factory()->create();
+        $student->syncRoles(['student']);
+        $offering = $this->createOffering();
+        Enrollment::factory()->create([
+            'course_offering_id' => $offering->id,
+            'student_id' => $student->id,
+            'status' => 'enrolled',
+        ]);
+
+        $material = CourseMaterial::factory()->create([
+            'course_offering_id' => $offering->id,
+            'type' => 'link',
+            'external_url' => 'https://example.com/resource',
+        ]);
+
+        $response = $this->actingAs($student)->getJson("/api/course-materials/{$material->id}/preview");
+
+        $response->assertOk()
+            ->assertJsonPath('data.type', 'link')
+            ->assertJsonPath('data.url', 'https://example.com/resource');
+    }
+
+    public function test_unrelated_user_cannot_preview_material(): void
+    {
+        $student = User::factory()->create();
+        $student->syncRoles(['student']);
+        $offering = $this->createOffering();
+        $material = CourseMaterial::factory()->create([
+            'course_offering_id' => $offering->id,
+            'type' => 'link',
+            'external_url' => 'https://example.com',
+        ]);
+
+        $response = $this->actingAs($student)->getJson("/api/course-materials/{$material->id}/preview");
+
+        $response->assertForbidden();
+    }
 }

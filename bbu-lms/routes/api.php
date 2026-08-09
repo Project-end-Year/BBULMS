@@ -49,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/course-offerings/{offering}/materials/tracking', [CourseMaterialController::class, 'tracking']);
 
     Route::get('/course-materials/{material}/download', [CourseMaterialController::class, 'download']);
+    Route::get('/course-materials/{material}/preview', [CourseMaterialController::class, 'preview']);
     Route::post('/course-materials/{material}/track-view', [CourseMaterialController::class, 'trackView']);
 
     Route::middleware('role:admin')->prefix('admin')->group(function () {

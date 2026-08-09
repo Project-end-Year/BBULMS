@@ -256,6 +256,40 @@ class CourseMaterialController extends Controller
     }
 
     /**
+     * Preview a material file inline (browser-rendered).
+     */
+    public function preview(CourseMaterial $material)
+    {
+        Gate::authorize('view', $material->courseOffering->course);
+
+        if ($material->type !== 'file') {
+            $this->trackAction($material, 'view');
+
+            return ApiResponse::success([
+                'type' => $material->type,
+                'url' => $material->external_url,
+            ]);
+        }
+
+        if (! $material->file_path || ! Storage::disk('public')->exists($material->file_path)) {
+            abort(404, 'File not found.');
+        }
+
+        $this->trackAction($material, 'view');
+
+        $mime = $material->mime_type ?: Storage::disk('public')->mimeType($material->file_path);
+
+        return Storage::disk('public')->response(
+            $material->file_path,
+            $material->file_name,
+            [
+                'Content-Type' => $mime,
+                'Content-Disposition' => 'inline; filename="' . $material->file_name . '"',
+            ]
+        );
+    }
+
+    /**
      * Track a view action.
      */
     public function trackView(CourseMaterial $material)

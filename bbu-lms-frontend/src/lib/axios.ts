@@ -12,6 +12,16 @@ export const api = axios.create({
 })
 
 /**
+ * Read the XSRF-TOKEN value from document.cookie.
+ */
+function getXsrfToken(): string | undefined {
+  const cookieRow = document.cookie
+    .split('; ')
+    .find((row) => row.startsWith('XSRF-TOKEN='))
+  return cookieRow ? decodeURIComponent(cookieRow.split('=')[1]) : undefined
+}
+
+/**
  * Request a fresh CSRF cookie from Laravel Sanctum.
  * Call this before any stateful request (login, register, etc.).
  */
@@ -23,8 +33,12 @@ export async function csrfCookie(): Promise<void> {
 
 api.interceptors.request.use(
   (config) => {
-    // Axios automatically sends the XSRF-TOKEN cookie as X-XSRF-TOKEN header
-    // when withCredentials is true. No manual header needed.
+    // Manually set X-XSRF-TOKEN from the XSRF-TOKEN cookie so Laravel
+    // CSRF protection passes for stateful Sanctum requests.
+    const token = getXsrfToken()
+    if (token) {
+      config.headers['X-XSRF-TOKEN'] = token
+    }
     return config
   },
   (error) => Promise.reject(error)
