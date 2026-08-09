@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useDropzone } from 'react-dropzone'
 import {
+  FileIcon,
   Loader2,
   MessageSquare,
   MoreVertical,
+  Paperclip,
   Phone,
   Search,
   Send,
   Video,
+  X,
 } from 'lucide-react'
 
 import { useAuth } from '@/hooks/useAuth'
@@ -18,6 +22,14 @@ import {
   useListenMessages,
 } from '@/hooks/useConversations'
 
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`
+}
+
 function formatTime(iso: string | null | undefined): string {
   if (!iso) return ''
   const date = new Date(iso)
@@ -26,6 +38,10 @@ function formatTime(iso: string | null | undefined): string {
   return isToday
     ? date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
     : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function isImage(file: File): boolean {
+  return file.type.startsWith('image/')
 }
 
 export default function ChatPage() {
@@ -115,7 +131,10 @@ export default function ChatPage() {
                     >
                       {conversation.latestMessage
                         ? `${conversation.latestMessage.sender?.name ?? ''}: ${
-                            conversation.latestMessage.content ?? ''
+                            conversation.latestMessage.content ??
+                            (conversation.latestMessage.type === 'attachment'
+                              ? 'Sent an attachment'
+                              : '')
                           }`
                         : 'No messages yet'}
                     </p>
@@ -157,7 +176,8 @@ function ActiveThread({ conversationId, currentUserId }: ActiveThreadProps) {
     1,
     50
   )
-  const { mutate: sendMessage, isPending: isSending } = useSendMessage(conversationId)
+  const { mutate: sendMessage, isPending: isSending } =
+    useSendMessage(conversationId)
 
   const [draft, setDraft] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -272,7 +292,31 @@ function ActiveThread({ conversationId, currentUserId }: ActiveThreadProps) {
                         <p className="truncate">{message.replyTo.content}</p>
                       </div>
                     )}
-                    <p>{message.content}</p>
+                    {message.content && <p>{message.content}</p>}
+                    {message.attachments.length > 0 && (
+                      <div className="mt-2 grid gap-2">
+                        {message.attachments.map((attachment) => (
+                          <div
+                            key={attachment.id}
+                            className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
+                              isMe
+                                ? 'border-white/20 bg-white/10'
+                                : 'border-gray-300 bg-white'
+                            }`}
+                          >
+                            <FileIcon className="h-4 w-4 shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-medium">
+                                {attachment.originalName}
+                              </p>
+                              <p className="text-[10px] opacity-80">
+                                {formatBytes(attachment.size)}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <span
                       className={`mt-1 block text-right text-xs ${
                         isMe ? 'text-white/80' : 'text-text-muted'
@@ -289,42 +333,155 @@ function ActiveThread({ conversationId, currentUserId }: ActiveThreadProps) {
         )}
       </div>
 
-      <div className="border-t border-gray-200 p-4">
-        <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-2">
-          <textarea
-            rows={1}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Type a message..."
-            className="max-h-32 flex-1 resize-none bg-transparent px-3 py-2 text-sm text-text outline-none placeholder:text-text-muted"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleSend()
-              }
-            }}
-          />
-          <button
-            type="button"
-            disabled={!draft.trim() || isSending}
-            onClick={handleSend}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bbu-blue text-white hover:bg-bbu-blue/90 disabled:opacity-50"
-          >
-            {isSending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-      </div>
+      <Composer
+        draft={draft}
+        onDraftChange={setDraft}
+        onSend={handleSend}
+        isSending={isSending}
+      />
     </div>
   )
 
-  function handleSend() {
-    const content = draft.trim()
-    if (!content) return
-    sendMessage({ content })
+  function handleSend(content: string, attachments: File[]) {
+    if (!content.trim() && attachments.length === 0) return
+    sendMessage({ content, attachments })
     setDraft('')
   }
+}
+
+interface ComposerProps {
+  draft: string
+  onDraftChange: (value: string) => void
+  onSend: (content: string, attachments: File[]) => void
+  isSending: boolean
+}
+
+function Composer({
+  draft,
+  onDraftChange,
+  onSend,
+  isSending,
+}: ComposerProps) {
+  const [files, setFiles] = useState<File[]>([])
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    setFiles((prev) => [...prev, ...acceptedFiles].slice(0, 10))
+  }, [])
+
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+    onDrop,
+    noClick: true,
+    noKeyboard: true,
+    accept: {
+      'image/*': [],
+      'application/pdf': [],
+      'application/vnd.openxmlformats-officedocument.*': [],
+      'application/msword': [],
+      'application/vnd.ms-excel': [],
+      'application/vnd.ms-powerpoint': [],
+      'text/plain': [],
+      'application/zip': [],
+    },
+    maxSize: 10 * 1024 * 1024,
+  })
+
+  function removeFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function handleSend() {
+    onSend(draft, files)
+    setFiles([])
+  }
+
+  const canSend = draft.trim() || files.length > 0
+
+  return (
+    <div className="border-t border-gray-200 bg-white p-4">
+      {files.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-2">
+          {files.map((file, index) => (
+            <div
+              key={`${file.name}-${index}`}
+              className="relative flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 pr-7"
+            >
+              {isImage(file) ? (
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt={file.name}
+                  className="h-10 w-10 rounded-md object-cover"
+                />
+              ) : (
+                <FileIcon className="h-6 w-6 text-text-muted" />
+              )}
+              <div className="min-w-0">
+                <p className="max-w-[120px] truncate text-xs font-medium text-text">
+                  {file.name}
+                </p>
+                <p className="text-[10px] text-text-muted">
+                  {formatBytes(file.size)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeFile(index)}
+                className="absolute right-1 top-1 rounded-full p-0.5 text-text-muted hover:bg-gray-200 hover:text-text"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        {...getRootProps()}
+        className={`flex items-end gap-2 rounded-2xl border bg-gray-50 p-2 ${
+          isDragActive
+            ? 'border-bbu-blue bg-bbu-blue/5'
+            : 'border-gray-200'
+        }`}
+      >
+        <input {...getInputProps()} />
+        <button
+          type="button"
+          onClick={open}
+          className="rounded-md p-2 text-text-muted hover:bg-gray-100 hover:text-text"
+          title="Attach file"
+        >
+          <Paperclip className="h-4 w-4" />
+        </button>
+        <textarea
+          rows={1}
+          value={draft}
+          onChange={(e) => onDraftChange(e.target.value)}
+          placeholder="Type a message..."
+          className="max-h-32 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-text outline-none placeholder:text-text-muted"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              handleSend()
+            }
+          }}
+        />
+        <button
+          type="button"
+          disabled={!canSend || isSending}
+          onClick={handleSend}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bbu-blue text-white hover:bg-bbu-blue/90 disabled:opacity-50"
+        >
+          {isSending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </button>
+      </div>
+      {isDragActive && (
+        <p className="mt-1 text-center text-xs text-bbu-blue">
+          Drop files here to attach
+        </p>
+      )}
+    </div>
+  )
 }

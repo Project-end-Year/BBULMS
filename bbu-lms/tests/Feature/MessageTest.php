@@ -90,7 +90,7 @@ class MessageTest extends TestCase
         ]);
 
         $response->assertStatus(422)
-            ->assertJsonPath('errors.content.0', 'The content field is required.');
+            ->assertJsonPath('errors.content.0', 'A message must have text or at least one attachment.');
     }
 
     public function test_participant_can_reply_to_message(): void

@@ -114,11 +114,27 @@ export function useMessages(conversationId: number | undefined, page: number = 1
 export function useSendMessage(conversationId: number | undefined) {
   const queryClient = useQueryClient()
 
-  return useMutation<{ message: Message }, Error, { content: string; replyToId?: number }>({
-    mutationFn: async ({ content, replyToId }) => {
-      const { data } = await api.post(`/conversations/${conversationId}/messages`, {
-        content,
-        replyToId,
+  return useMutation<
+    { message: Message },
+    Error,
+    { content?: string; replyToId?: number; attachments?: File[] }
+  >({
+    mutationFn: async ({ content = '', replyToId, attachments }) => {
+      const formData = new FormData()
+      formData.append('content', content)
+      if (replyToId) {
+        formData.append('replyToId', String(replyToId))
+      }
+      if (attachments && attachments.length > 0) {
+        attachments.forEach((file) => {
+          formData.append('attachments[]', file)
+        })
+      }
+
+      const { data } = await api.post(`/conversations/${conversationId}/messages`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       })
       return data.data as { message: Message }
     },
