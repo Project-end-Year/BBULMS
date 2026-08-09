@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/axios'
+import { useEcho } from '@/contexts/EchoContext'
 
 export interface ConversationUser {
   id: number
@@ -109,16 +111,49 @@ export function useMessages(conversationId: number | undefined, page: number = 1
   })
 }
 
-export function useCreateDirectConversation() {
+export function useSendMessage(conversationId: number | undefined) {
   const queryClient = useQueryClient()
 
-  return useMutation<SingleConversationData, Error, { userId: number }>({
-    mutationFn: async ({ userId }) => {
-      const { data } = await api.post('/conversations/direct', { userId })
-      return data.data as SingleConversationData
+  return useMutation<{ message: Message }, Error, { content: string; replyToId?: number }>({
+    mutationFn: async ({ content, replyToId }) => {
+      const { data } = await api.post(`/conversations/${conversationId}/messages`, {
+        content,
+        replyToId,
+      })
+      return data.data as { message: Message }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversationId] })
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     },
   })
+}
+
+export function useListenMessages(conversationId: number | undefined) {
+  const { echo } = useEcho()
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    if (!echo || !conversationId) return
+
+    const channel = echo.private(`conversation.${conversationId}`)
+
+    channel.listen('.message.sent', (event: { message: Message }) => {
+      queryClient.setQueryData<MessagesData>(
+        ['conversation-messages', conversationId],
+        (old) => {
+          if (!old) return old
+          const exists = old.messages.some((m) => m.id === event.message.id)
+          if (exists) return old
+          return { ...old, messages: [event.message, ...old.messages] }
+        }
+      )
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    })
+
+    return () => {
+      channel.stopListening('.message.sent')
+      echo.leave(`private-conversation.${conversationId}`)
+    }
+  }, [echo, conversationId, queryClient])
 }

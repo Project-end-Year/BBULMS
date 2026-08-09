@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Loader2,
   MessageSquare,
@@ -14,6 +14,8 @@ import {
   useConversations,
   useConversation,
   useMessages,
+  useSendMessage,
+  useListenMessages,
 } from '@/hooks/useConversations'
 
 function formatTime(iso: string | null | undefined): string {
@@ -155,9 +157,19 @@ function ActiveThread({ conversationId, currentUserId }: ActiveThreadProps) {
     1,
     50
   )
+  const { mutate: sendMessage, isPending: isSending } = useSendMessage(conversationId)
+
+  const [draft, setDraft] = useState('')
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useListenMessages(conversationId)
 
   const conversation = conversationData?.conversation
   const messages = messagesData?.messages ?? []
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   const otherParticipant = conversation?.participants.find(
     (p) => p.user.id !== currentUserId
@@ -272,6 +284,7 @@ function ActiveThread({ conversationId, currentUserId }: ActiveThreadProps) {
                 </div>
               )
             })}
+            <div ref={messagesEndRef} />
           </div>
         )}
       </div>
@@ -280,22 +293,38 @@ function ActiveThread({ conversationId, currentUserId }: ActiveThreadProps) {
         <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-2">
           <textarea
             rows={1}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
             placeholder="Type a message..."
             className="max-h-32 flex-1 resize-none bg-transparent px-3 py-2 text-sm text-text outline-none placeholder:text-text-muted"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
+                handleSend()
               }
             }}
           />
           <button
             type="button"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bbu-blue text-white hover:bg-bbu-blue/90"
+            disabled={!draft.trim() || isSending}
+            onClick={handleSend}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bbu-blue text-white hover:bg-bbu-blue/90 disabled:opacity-50"
           >
-            <Send className="h-4 w-4" />
+            {isSending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </button>
         </div>
       </div>
     </div>
   )
+
+  function handleSend() {
+    const content = draft.trim()
+    if (!content) return
+    sendMessage({ content })
+    setDraft('')
+  }
 }

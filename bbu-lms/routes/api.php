@@ -3,6 +3,7 @@
 use App\Events\TestBroadcastEvent;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ClassScheduleController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\CourseController;
@@ -48,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/conversations/direct', [ConversationController::class, 'storeDirect']);
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
     Route::get('/conversations/{conversation}/messages', [ConversationController::class, 'messages']);
+    Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
 
     Route::get('/course-offerings/{offering}/conversation', [ConversationController::class, 'showForOffering']);
 

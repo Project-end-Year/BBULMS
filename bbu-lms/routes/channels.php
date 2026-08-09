@@ -20,3 +20,10 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 Broadcast::channel('public', function () {
     return true;
 });
+
+Broadcast::channel('conversation.{conversationId}', function ($user, int $conversationId) {
+    return \App\Models\ConversationParticipant::query()
+        ->where('conversation_id', $conversationId)
+        ->where('user_id', $user->id)
+        ->exists();
+});
