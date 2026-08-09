@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClassScheduleController;
 use App\Http\Controllers\CourseController;
@@ -35,6 +36,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my-courses', [CourseOfferingController::class, 'myCourses']);
     Route::get('/courses/{course}/summary', [CourseController::class, 'summary']);
     Route::get('/courses/{course}/class-schedules', [ClassScheduleController::class, 'index']);
+    Route::get('/courses/{course}/announcements', [AnnouncementController::class, 'index']);
+    Route::post('/courses/{course}/announcements', [AnnouncementController::class, 'store']);
+    Route::put('/courses/{course}/announcements/{announcement}', [AnnouncementController::class, 'update']);
+    Route::delete('/courses/{course}/announcements/{announcement}', [AnnouncementController::class, 'destroy']);
 
     Route::get('/course-offerings/{offering}/enrollments', [EnrollmentController::class, 'index']);
     Route::post('/course-offerings/{offering}/enrollments', [EnrollmentController::class, 'store']);
