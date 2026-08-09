@@ -1,21 +1,301 @@
-import { MessageSquare } from 'lucide-react'
+import { useState } from 'react'
+import {
+  Loader2,
+  MessageSquare,
+  MoreVertical,
+  Phone,
+  Search,
+  Send,
+  Video,
+} from 'lucide-react'
 
-function ChatPage() {
+import { useAuth } from '@/hooks/useAuth'
+import {
+  useConversations,
+  useConversation,
+  useMessages,
+} from '@/hooks/useConversations'
+
+function formatTime(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  const now = new Date()
+  const isToday = date.toDateString() === now.toDateString()
+  return isToday
+    ? date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+    : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+export default function ChatPage() {
+  const { user } = useAuth()
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const { data, isLoading } = useConversations()
+
+  const conversations = data?.conversations ?? []
+
   return (
-    <div className="flex h-[calc(100vh-4rem)] gap-4">
-      <div className="w-72 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="mb-4 flex items-center gap-2">
-          <MessageSquare className="h-5 w-5 text-bbu-blue" />
-          <h2 className="font-semibold text-text">Conversations</h2>
+    <div className="flex h-[calc(100vh-4rem)] gap-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <aside className="flex w-80 flex-col border-r border-gray-200 bg-gray-50/50">
+        <div className="border-b border-gray-200 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold text-text">Chat</h2>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                className="rounded-md p-1.5 text-text-muted hover:bg-gray-100 hover:text-text"
+                title="New chat"
+              >
+                <MessageSquare className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-text-muted" />
+            <input
+              type="text"
+              placeholder="Search chats"
+              className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-text outline-none placeholder:text-text-muted focus:border-bbu-blue focus:ring-1 focus:ring-bbu-blue"
+            />
+          </div>
         </div>
-        <p className="text-sm text-text-muted">Chat list will be populated in Step 31+.</p>
-      </div>
 
-      <div className="flex-1 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <p className="text-text-muted">Select a conversation to start messaging.</p>
-      </div>
+        <div className="flex-1 overflow-y-auto p-2">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-text-muted" />
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-text-muted">
+              No conversations yet.
+            </div>
+          ) : (
+            conversations.map((conversation) => {
+              const other = conversation.participants.find(
+                (p) => p.user.id !== user?.id
+              )?.user
+              const title =
+                conversation.title ??
+                other?.name ??
+                conversation.participants.map((p) => p.user.name).join(', ')
+              const unread = conversation.lastReadAt
+                ? conversation.latestMessage &&
+                  new Date(conversation.latestMessage.createdAt) >
+                    new Date(conversation.lastReadAt)
+                : !!conversation.latestMessage
+
+              return (
+                <button
+                  key={conversation.id}
+                  type="button"
+                  onClick={() => setSelectedId(conversation.id)}
+                  className={`flex w-full items-start gap-3 rounded-lg p-3 text-left transition-colors ${
+                    selectedId === conversation.id
+                      ? 'bg-bbu-blue/10'
+                      : 'hover:bg-white'
+                  }`}
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-bbu-blue text-sm font-semibold text-white">
+                    {title.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-medium text-text">
+                        {title}
+                      </span>
+                      <span className="shrink-0 text-xs text-text-muted">
+                        {formatTime(conversation.latestMessage?.createdAt)}
+                      </span>
+                    </div>
+                    <p
+                      className={`truncate text-sm ${
+                        unread ? 'font-medium text-text' : 'text-text-muted'
+                      }`}
+                    >
+                      {conversation.latestMessage
+                        ? `${conversation.latestMessage.sender?.name ?? ''}: ${
+                            conversation.latestMessage.content ?? ''
+                          }`
+                        : 'No messages yet'}
+                    </p>
+                  </div>
+                </button>
+              )
+            })
+          )}
+        </div>
+      </aside>
+
+      {selectedId ? (
+        <ActiveThread conversationId={selectedId} currentUserId={user?.id} />
+      ) : (
+        <div className="flex flex-1 flex-col items-center justify-center bg-white p-6 text-center">
+          <MessageSquare className="mb-3 h-12 w-12 text-text-muted/40" />
+          <h3 className="text-lg font-medium text-text">
+            Select a conversation
+          </h3>
+          <p className="mt-1 max-w-xs text-sm text-text-muted">
+            Choose a chat from the list to start messaging.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
 
-export default ChatPage
+interface ActiveThreadProps {
+  conversationId: number
+  currentUserId?: number
+}
+
+function ActiveThread({ conversationId, currentUserId }: ActiveThreadProps) {
+  const { data: conversationData, isLoading: conversationLoading } =
+    useConversation(conversationId)
+  const { data: messagesData, isLoading: messagesLoading } = useMessages(
+    conversationId,
+    1,
+    50
+  )
+
+  const conversation = conversationData?.conversation
+  const messages = messagesData?.messages ?? []
+
+  const otherParticipant = conversation?.participants.find(
+    (p) => p.user.id !== currentUserId
+  )?.user
+  const title =
+    conversation?.title ??
+    otherParticipant?.name ??
+    conversation?.participants.map((p) => p.user.name).join(', ') ??
+    'Chat'
+
+  return (
+    <div className="flex flex-1 flex-col bg-white">
+      <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-bbu-blue text-sm font-semibold text-white">
+            {title.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h3 className="font-medium text-text">{title}</h3>
+            <p className="text-xs text-text-muted">
+              {conversation?.participants.length ?? 0} participants
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="rounded-md p-2 text-text-muted hover:bg-gray-100 hover:text-text"
+          >
+            <Phone className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="rounded-md p-2 text-text-muted hover:bg-gray-100 hover:text-text"
+          >
+            <Video className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="rounded-md p-2 text-text-muted hover:bg-gray-100 hover:text-text"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </button>
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {conversationLoading || messagesLoading ? (
+          <div className="flex h-full items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-text-muted" />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center text-center text-sm text-text-muted">
+            <MessageSquare className="mb-2 h-8 w-8 opacity-40" />
+            <p>No messages yet.</p>
+            <p>Send the first message to get started.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {[...messages].reverse().map((message, index) => {
+              const isMe = message.sender?.id === currentUserId
+              const showAvatar =
+                index === 0 ||
+                messages[index - 1]?.sender?.id !== message.sender?.id
+
+              return (
+                <div
+                  key={message.id}
+                  className={`flex gap-3 ${
+                    isMe ? 'flex-row-reverse' : 'flex-row'
+                  }`}
+                >
+                  <div className="flex w-8 flex-col items-center">
+                    {showAvatar ? (
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-text">
+                        {(message.sender?.name ?? '?').charAt(0).toUpperCase()}
+                      </div>
+                    ) : (
+                      <div className="h-8 w-8" />
+                    )}
+                  </div>
+                  <div
+                    className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm ${
+                      isMe
+                        ? 'rounded-br-none bg-bbu-blue text-white'
+                        : 'rounded-bl-none bg-gray-100 text-text'
+                    }`}
+                  >
+                    {message.replyTo && (
+                      <div
+                        className={`mb-2 border-l-2 pl-2 text-xs ${
+                          isMe
+                            ? 'border-white/40 text-white/80'
+                            : 'border-bbu-blue text-text-muted'
+                        }`}
+                      >
+                        <span className="font-medium">
+                          {message.replyTo.sender?.name ?? 'Unknown'}
+                        </span>
+                        <p className="truncate">{message.replyTo.content}</p>
+                      </div>
+                    )}
+                    <p>{message.content}</p>
+                    <span
+                      className={`mt-1 block text-right text-xs ${
+                        isMe ? 'text-white/80' : 'text-text-muted'
+                      }`}
+                    >
+                      {formatTime(message.createdAt)}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-gray-200 p-4">
+        <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-2">
+          <textarea
+            rows={1}
+            placeholder="Type a message..."
+            className="max-h-32 flex-1 resize-none bg-transparent px-3 py-2 text-sm text-text outline-none placeholder:text-text-muted"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bbu-blue text-white hover:bg-bbu-blue/90"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
