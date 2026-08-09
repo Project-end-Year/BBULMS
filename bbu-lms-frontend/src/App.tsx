@@ -4,6 +4,7 @@ import { Toaster } from 'sonner'
 
 import { queryClient } from '@/lib/queryClient'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { EchoProvider } from '@/contexts/EchoContext'
 import { RequireAuth, RequireRole } from '@/components/auth/RequireRole'
 import AppLayout from '@/layouts/AppLayout'
 import LoginPage from '@/pages/LoginPage'
@@ -26,8 +27,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
-          <Routes>
+        <EchoProvider>
+          <BrowserRouter>
+            <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -58,9 +60,10 @@ function App() {
             <Route path="*" element={<div className="flex min-h-screen items-center justify-center text-text-muted">404 Not Found</div>} />
           </Routes>
         </BrowserRouter>
-      </AuthProvider>
-      <Toaster position="top-right" />
-    </QueryClientProvider>
+      </EchoProvider>
+    </AuthProvider>
+    <Toaster position="top-right" richColors />
+  </QueryClientProvider>
   )
 }
 

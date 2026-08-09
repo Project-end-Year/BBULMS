@@ -1,5 +1,6 @@
 <?php
 
+use App\Events\TestBroadcastEvent;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClassScheduleController;
@@ -19,6 +20,12 @@ Route::get('/health', function () {
         'service' => 'bbu-lms-api',
         'time' => now()->toIso8601String(),
     ]);
+});
+
+Route::post('/broadcast-test', function () {
+    broadcast(new TestBroadcastEvent('Ping from BBU LMS'))->toOthers();
+
+    return ApiResponse::success(['message' => 'Broadcast dispatched.']);
 });
 
 Route::post('/login', [AuthController::class, 'login']);
