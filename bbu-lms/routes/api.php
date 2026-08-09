@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClassScheduleController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\CourseOfferingController;
+use App\Http\Controllers\CourseMaterialController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\StudentSearchController;
@@ -40,6 +41,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/course-offerings/{offering}/enrollments/{student}', [EnrollmentController::class, 'destroy']);
 
     Route::get('/students/search', [StudentSearchController::class, '__invoke']);
+
+    Route::get('/course-offerings/{offering}/materials', [CourseMaterialController::class, 'index']);
+    Route::post('/course-offerings/{offering}/materials', [CourseMaterialController::class, 'store']);
+    Route::put('/course-offerings/{offering}/materials/{material}', [CourseMaterialController::class, 'update']);
+    Route::delete('/course-offerings/{offering}/materials/{material}', [CourseMaterialController::class, 'destroy']);
+    Route::get('/course-offerings/{offering}/materials/tracking', [CourseMaterialController::class, 'tracking']);
+
+    Route::get('/course-materials/{material}/download', [CourseMaterialController::class, 'download']);
+    Route::post('/course-materials/{material}/track-view', [CourseMaterialController::class, 'trackView']);
 
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::get('/users/form-meta', [UserController::class, 'formMeta']);

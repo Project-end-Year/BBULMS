@@ -53,4 +53,9 @@ class CourseOffering extends Model
     {
         return $this->hasMany(ClassSchedule::class);
     }
+
+    public function materials(): HasMany
+    {
+        return $this->hasMany(CourseMaterial::class);
+    }
 }
