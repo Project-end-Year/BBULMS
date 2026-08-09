@@ -4,6 +4,7 @@ use App\Events\TestBroadcastEvent;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClassScheduleController;
+use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\CourseOfferingController;
 use App\Http\Controllers\CourseMaterialController;
@@ -42,6 +43,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/my-courses', [CourseOfferingController::class, 'myCourses']);
     Route::get('/announcements', [AnnouncementController::class, 'feed']);
+
+    Route::get('/conversations', [ConversationController::class, 'index']);
+    Route::post('/conversations/direct', [ConversationController::class, 'storeDirect']);
+    Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
+
     Route::get('/courses/{course}/summary', [CourseController::class, 'summary']);
     Route::get('/courses/{course}/class-schedules', [ClassScheduleController::class, 'index']);
     Route::get('/courses/{course}/announcements', [AnnouncementController::class, 'index']);
