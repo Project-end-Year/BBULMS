@@ -36,6 +36,17 @@ class Conversation extends Model
         return $this->belongsTo(CourseOffering::class);
     }
 
+    protected static function booted(): void
+    {
+        static::created(function (Conversation $conversation) {
+            if ($conversation->type === 'course' && $conversation->course_offering_id) {
+                app(\App\Services\CourseConversationService::class)->ensureForOffering(
+                    CourseOffering::find($conversation->course_offering_id)
+                );
+            }
+        });
+    }
+
     public function participants(): HasMany
     {
         return $this->hasMany(ConversationParticipant::class);

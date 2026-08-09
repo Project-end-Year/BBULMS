@@ -58,4 +58,9 @@ class CourseOffering extends Model
     {
         return $this->hasMany(CourseMaterial::class);
     }
+
+    public function conversation(): BelongsTo
+    {
+        return $this->belongsTo(Conversation::class)->where('type', 'course');
+    }
 }

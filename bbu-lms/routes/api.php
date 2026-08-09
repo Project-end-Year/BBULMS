@@ -47,6 +47,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/conversations', [ConversationController::class, 'index']);
     Route::post('/conversations/direct', [ConversationController::class, 'storeDirect']);
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
+    Route::get('/conversations/{conversation}/messages', [ConversationController::class, 'messages']);
+
+    Route::get('/course-offerings/{offering}/conversation', [ConversationController::class, 'showForOffering']);
 
     Route::get('/courses/{course}/summary', [CourseController::class, 'summary']);
     Route::get('/courses/{course}/class-schedules', [ClassScheduleController::class, 'index']);

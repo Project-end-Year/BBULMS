@@ -6,6 +6,8 @@ use App\Http\Resources\ApiResponse;
 use App\Http\Resources\ConversationResource;
 use App\Models\Conversation;
 use App\Models\ConversationParticipant;
+use App\Models\CourseOffering;
+use App\Models\Message;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +17,68 @@ use Illuminate\Validation\ValidationException;
 
 class ConversationController extends Controller
 {
+    /**
+     * Show the course conversation for a specific course offering.
+     */
+    public function showForOffering(CourseOffering $offering)
+    {
+        $user = $this->requireUser();
+
+        $conversation = Conversation::query()
+            ->where('type', 'course')
+            ->where('course_offering_id', $offering->id)
+            ->with(['creator', 'courseOffering', 'participants.user'])
+            ->firstOrFail();
+
+        Gate::authorize('view', $conversation);
+
+        $conversation->loadMissing(['messages' => fn ($query) => $query->latest()->limit(1)]);
+
+        return ApiResponse::success([
+            'conversation' => new ConversationResource($conversation),
+        ]);
+    }
+
+    /**
+     * List messages for a conversation with pagination.
+     */
+    public function messages(Request $request, Conversation $conversation)
+    {
+        $user = $this->requireUser();
+        Gate::authorize('participate', $conversation);
+
+        $validated = $request->validate([
+            'perPage' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'before' => ['nullable', 'integer', 'exists:messages,id'],
+        ]);
+
+        $perPage = $validated['perPage'] ?? 25;
+
+        $query = Message::query()
+            ->where('conversation_id', $conversation->id)
+            ->whereNull('deleted_at')
+            ->with(['sender', 'replyTo.sender', 'attachments'])
+            ->orderByDesc('created_at');
+
+        if (! empty($validated['before'])) {
+            $query->where('id', '<', $validated['before']);
+        }
+
+        $messages = $query->paginate($perPage);
+
+        return ApiResponse::success([
+            'messages' => \App\Http\Resources\MessageResource::collection($messages),
+            'pagination' => [
+                'currentPage' => $messages->currentPage(),
+                'lastPage' => $messages->lastPage(),
+                'perPage' => $messages->perPage(),
+                'total' => $messages->total(),
+                'from' => $messages->firstItem(),
+                'to' => $messages->lastItem(),
+            ],
+        ]);
+    }
+
     /**
      * List conversations the authenticated user participates in.
      */
