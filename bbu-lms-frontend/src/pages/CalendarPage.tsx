@@ -102,7 +102,7 @@ export default function CalendarPage() {
   const { mutate: deleteEvent } = useDeleteCalendarEvent()
 
   const events = data?.events ?? []
-  const isManager = user?.roles.some((r) => ['admin', 'lecturer'].includes(r.name)) ?? false
+  const isAuthenticated = !!user
 
   const bigCalendarEvents: BigCalendarEvent[] = useMemo(() => {
     return events.map((event) => ({
@@ -116,7 +116,7 @@ export default function CalendarPage() {
   }, [events])
 
   function handleSelectSlot(slotInfo: { start: Date; end: Date }) {
-    if (!isManager) return
+    if (!isAuthenticated) return
     setEditingEvent(null)
     setIsModalOpen(true)
     // Seed the form with slot info when opening.
@@ -175,7 +175,7 @@ export default function CalendarPage() {
           <CalendarDays className="h-6 w-6 text-bbu-blue" />
           <h1 className="text-xl font-semibold text-text">Calendar</h1>
         </div>
-        {isManager && (
+        {isAuthenticated && (
           <button
             type="button"
             onClick={handleAdd}
@@ -204,7 +204,7 @@ export default function CalendarPage() {
             date={currentDate}
             onView={setCurrentView}
             onNavigate={setCurrentDate}
-            selectable={isManager}
+            selectable={isAuthenticated}
             onSelectSlot={handleSelectSlot}
             onSelectEvent={handleSelectEvent}
             eventPropGetter={(bigEvent) => ({
@@ -236,11 +236,7 @@ export default function CalendarPage() {
       {selectedEvent && (
         <EventDetailModal
           event={selectedEvent}
-          canManage={
-            isManager &&
-            (selectedEvent.createdBy === user?.id ||
-              (user?.roles.some((r) => r.name === 'admin') ?? false))
-          }
+          currentUserId={user?.id}
           onClose={() => setSelectedEvent(null)}
           onEdit={() => handleEdit(selectedEvent)}
           onDelete={() => handleDelete(selectedEvent)}
@@ -321,7 +317,7 @@ function CalendarToolbar({ label, onNavigate, currentView, onChangeView }: Calen
 
 interface EventDetailModalProps {
   event: CalendarEvent
-  canManage: boolean
+  currentUserId: number | undefined
   onClose: () => void
   onEdit: () => void
   onDelete: () => void
@@ -329,7 +325,7 @@ interface EventDetailModalProps {
 
 function EventDetailModal({
   event,
-  canManage,
+  currentUserId,
   onClose,
   onEdit,
   onDelete,
@@ -398,7 +394,7 @@ function EventDetailModal({
           )}
         </div>
 
-        {canManage && !event.sourceType && (
+        {event.createdBy === currentUserId && !event.sourceType && (
           <div className="mt-6 flex justify-end gap-2">
             <button
               type="button"

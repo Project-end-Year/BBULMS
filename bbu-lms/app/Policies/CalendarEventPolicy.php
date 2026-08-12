@@ -19,7 +19,7 @@ class CalendarEventPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasAnyRole(['admin', 'lecturer']);
+        return $user->hasAnyRole(['admin', 'lecturer', 'student']);
     }
 
     public function update(User $user, CalendarEvent $event): bool

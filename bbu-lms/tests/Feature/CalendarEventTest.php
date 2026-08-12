@@ -155,14 +155,32 @@ class CalendarEventTest extends TestCase
             ->assertJsonPath('data.event.type', 'exam');
     }
 
-    public function test_student_cannot_create_event(): void
+    public function test_student_can_create_personal_event(): void
     {
         $student = User::factory()->create()->assignRole('student');
 
         $response = $this->actingAs($student)->postJson('/api/calendar/events', [
-            'title' => 'Party',
+            'title' => 'Personal study session',
+            'type' => 'event',
+            'startAt' => now()->addDays(2)->toDateTimeString(),
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.event.title', 'Personal study session')
+            ->assertJsonPath('data.event.createdBy', $student->id)
+            ->assertJsonPath('data.event.courseOfferingId', null);
+    }
+
+    public function test_student_cannot_link_event_to_course_offering(): void
+    {
+        $context = $this->createCourseContext();
+        $student = User::factory()->create()->assignRole('student');
+
+        $response = $this->actingAs($student)->postJson('/api/calendar/events', [
+            'title' => 'Bad event',
             'type' => 'event',
             'startAt' => now()->toDateTimeString(),
+            'courseOfferingId' => $context['offering']->id,
         ]);
 
         $response->assertForbidden();

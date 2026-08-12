@@ -117,6 +117,10 @@ class CalendarEventController extends Controller
         ]);
 
         if (! empty($validated['courseOfferingId'])) {
+            if ($user->hasRole('student')) {
+                return ApiResponse::error('Students cannot link events to course offerings.', 403);
+            }
+
             $offering = CourseOffering::findOrFail($validated['courseOfferingId']);
             if (! $user->hasRole('admin') && $offering->lecturer_id !== $user->id) {
                 return ApiResponse::error('You can only create events for your own offerings.', 403);
