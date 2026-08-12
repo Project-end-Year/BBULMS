@@ -13,6 +13,8 @@ return new class extends Migration
             $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
             $table->foreignId('course_id')->nullable()->constrained('courses')->onDelete('cascade');
             $table->foreignId('course_offering_id')->nullable()->constrained('course_offerings')->onDelete('cascade');
+            $table->string('source_type')->nullable()->index();
+            $table->unsignedBigInteger('source_id')->nullable()->index();
             $table->string('title');
             $table->text('description')->nullable();
             $table->string('type')->default('event'); // class, assignment, quiz, exam, event

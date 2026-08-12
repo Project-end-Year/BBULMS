@@ -132,6 +132,7 @@ export default function CalendarPage() {
   }
 
   function handleEdit(event: CalendarEvent) {
+    if (event.sourceType) return
     setEditingEvent(event)
     setIsModalOpen(true)
     setSelectedEvent(null)
@@ -274,7 +275,7 @@ export default function CalendarPage() {
       {selectedEvent && (
         <EventDetailModal
           event={selectedEvent}
-          canManage={isManager && selectedEvent.createdBy === user?.id}
+          canManage={isManager && (selectedEvent.createdBy === user?.id || (user?.roles.some((r) => r.name === 'admin') ?? false))}
           onClose={() => setSelectedEvent(null)}
           onEdit={() => handleEdit(selectedEvent)}
           onDelete={() => handleDelete(selectedEvent)}
@@ -367,7 +368,7 @@ function EventDetailModal({
           )}
         </div>
 
-        {canManage && (
+        {canManage && !event.sourceType && (
           <div className="mt-6 flex justify-end gap-2">
             <button
               type="button"

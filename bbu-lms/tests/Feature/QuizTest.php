@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\CalendarEvent;
 use App\Models\Course;
 use App\Models\CourseOffering;
 use App\Models\Department;
@@ -273,6 +274,142 @@ class QuizTest extends TestCase
         $this->actingAs($otherLecturer)
             ->deleteJson("/api/course-offerings/{$context['offering']->id}/quizzes/{$quiz->id}")
             ->assertForbidden();
+    }
+
+    public function test_published_exam_creates_calendar_event(): void
+    {
+        $context = $this->createOfferingContext();
+        $start = now()->addDays(3)->toDateTimeString();
+        $end = now()->addDays(3)->addHours(2)->toDateTimeString();
+
+        $response = $this->actingAs($context['lecturer'])->postJson(
+            "/api/course-offerings/{$context['offering']->id}/quizzes",
+            [
+                'title' => 'Midterm Exam',
+                'description' => 'Covers chapters 1-5',
+                'type' => 'exam',
+                'isPublished' => true,
+                'startsAt' => $start,
+                'endsAt' => $end,
+            ]
+        );
+
+        $response->assertCreated();
+        $quizId = $response->json('data.quiz.id');
+
+        $this->assertDatabaseHas('calendar_events', [
+            'source_type' => 'quiz',
+            'source_id' => $quizId,
+            'type' => 'exam',
+            'course_offering_id' => $context['offering']->id,
+        ]);
+    }
+
+    public function test_unpublished_exam_does_not_create_calendar_event(): void
+    {
+        $context = $this->createOfferingContext();
+
+        $response = $this->actingAs($context['lecturer'])->postJson(
+            "/api/course-offerings/{$context['offering']->id}/quizzes",
+            [
+                'title' => 'Draft Exam',
+                'type' => 'exam',
+                'isPublished' => false,
+                'startsAt' => now()->addDays(3)->toDateTimeString(),
+            ]
+        );
+
+        $response->assertCreated();
+        $quizId = $response->json('data.quiz.id');
+
+        $this->assertDatabaseMissing('calendar_events', [
+            'source_type' => 'quiz',
+            'source_id' => $quizId,
+        ]);
+    }
+
+    public function test_practice_quiz_does_not_create_calendar_event(): void
+    {
+        $context = $this->createOfferingContext();
+
+        $response = $this->actingAs($context['lecturer'])->postJson(
+            "/api/course-offerings/{$context['offering']->id}/quizzes",
+            [
+                'title' => 'Practice Quiz',
+                'type' => 'practice',
+                'isPublished' => true,
+                'startsAt' => now()->addDays(3)->toDateTimeString(),
+            ]
+        );
+
+        $response->assertCreated();
+        $quizId = $response->json('data.quiz.id');
+
+        $this->assertDatabaseMissing('calendar_events', [
+            'source_type' => 'quiz',
+            'source_id' => $quizId,
+        ]);
+    }
+
+    public function test_publishing_exam_creates_calendar_event_and_unpublishing_removes_it(): void
+    {
+        $context = $this->createOfferingContext();
+        $quiz = Quiz::factory()->create([
+            'course_offering_id' => $context['offering']->id,
+            'created_by' => $context['lecturer']->id,
+            'type' => 'exam',
+            'is_published' => false,
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        $this->actingAs($context['lecturer'])->postJson(
+            "/api/course-offerings/{$context['offering']->id}/quizzes/{$quiz->id}/toggle-published"
+        )->assertOk();
+
+        $this->assertDatabaseHas('calendar_events', [
+            'source_type' => 'quiz',
+            'source_id' => $quiz->id,
+            'type' => 'exam',
+        ]);
+
+        $this->actingAs($context['lecturer'])->postJson(
+            "/api/course-offerings/{$context['offering']->id}/quizzes/{$quiz->id}/toggle-published"
+        )->assertOk();
+
+        $this->assertDatabaseMissing('calendar_events', [
+            'source_type' => 'quiz',
+            'source_id' => $quiz->id,
+        ]);
+    }
+
+    public function test_deleting_exam_removes_calendar_event(): void
+    {
+        $context = $this->createOfferingContext();
+        $quiz = Quiz::factory()->create([
+            'course_offering_id' => $context['offering']->id,
+            'created_by' => $context['lecturer']->id,
+            'type' => 'exam',
+            'is_published' => true,
+            'starts_at' => now()->addDays(2),
+        ]);
+        CalendarEvent::factory()->create([
+            'source_type' => 'quiz',
+            'source_id' => $quiz->id,
+            'course_offering_id' => $context['offering']->id,
+            'type' => 'exam',
+            'title' => $quiz->title,
+            'start_at' => $quiz->starts_at,
+            'created_by' => $context['lecturer']->id,
+        ]);
+
+        $this->actingAs($context['lecturer'])->deleteJson(
+            "/api/course-offerings/{$context['offering']->id}/quizzes/{$quiz->id}"
+        )->assertOk();
+
+        $this->assertDatabaseMissing('calendar_events', [
+            'source_type' => 'quiz',
+            'source_id' => $quiz->id,
+        ]);
     }
 
     public function test_guest_cannot_access_quiz_routes(): void

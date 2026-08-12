@@ -14,6 +14,8 @@ export interface CalendarEvent {
   color: string | null
   courseId: number | null
   courseOfferingId: number | null
+  sourceType: string | null
+  sourceId: number | null
   course?: { id: number; code: string; name: string } | null
   courseOffering?: { id: number; section: string | null } | null
   createdBy: number

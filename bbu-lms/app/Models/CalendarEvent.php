@@ -16,6 +16,8 @@ class CalendarEvent extends Model
         'created_by',
         'course_id',
         'course_offering_id',
+        'source_type',
+        'source_id',
         'title',
         'description',
         'type',

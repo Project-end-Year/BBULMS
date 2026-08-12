@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\ApiResponse;
 use App\Http\Resources\QuizResource;
+use App\Models\CalendarEvent;
 use App\Models\CourseOffering;
 use App\Models\Question;
 use App\Models\QuestionOption;
 use App\Models\Quiz;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -90,6 +92,8 @@ class QuizController extends Controller
             $this->syncQuestions($quiz, $validated['questions']);
         }
 
+        $this->syncExamCalendarEvent($quiz);
+
         return ApiResponse::success(
             ['quiz' => new QuizResource($quiz->load(['questions.options', 'creator']))],
             'Quiz created.',
@@ -156,6 +160,8 @@ class QuizController extends Controller
             $this->syncQuestions($quiz, $validated['questions']);
         }
 
+        $this->syncExamCalendarEvent($quiz);
+
         return ApiResponse::success(
             ['quiz' => new QuizResource($quiz->load(['questions.options', 'creator']))],
             'Quiz updated.'
@@ -166,6 +172,12 @@ class QuizController extends Controller
     {
         $this->requireUser();
         Gate::authorize('delete', $quiz);
+
+        CalendarEvent::query()
+            ->where('source_type', 'quiz')
+            ->where('source_id', $quiz->id)
+            ->where('type', 'exam')
+            ->delete();
 
         $quiz->delete();
 
@@ -179,9 +191,47 @@ class QuizController extends Controller
 
         $quiz->update(['is_published' => ! $quiz->is_published]);
 
+        $this->syncExamCalendarEvent($quiz);
+
         return ApiResponse::success(
             ['quiz' => new QuizResource($quiz->load(['questions.options', 'creator']))],
             $quiz->is_published ? 'Quiz published.' : 'Quiz unpublished.'
+        );
+    }
+
+    private function syncExamCalendarEvent(Quiz $quiz): void
+    {
+        if ($quiz->type !== 'exam' || ! $quiz->is_published || $quiz->starts_at === null) {
+            CalendarEvent::query()
+                ->where('source_type', 'quiz')
+                ->where('source_id', $quiz->id)
+                ->where('type', 'exam')
+                ->delete();
+
+            return;
+        }
+
+        $offering = CourseOffering::query()->with('course')->find($quiz->course_offering_id);
+        $courseName = $offering?->course?->name;
+
+        CalendarEvent::updateOrCreate(
+            [
+                'source_type' => 'quiz',
+                'source_id' => $quiz->id,
+                'type' => 'exam',
+            ],
+            [
+                'created_by' => $quiz->created_by,
+                'course_id' => $offering?->course_id,
+                'course_offering_id' => $quiz->course_offering_id,
+                'title' => $quiz->title.($courseName ? " ({$courseName})" : ''),
+                'description' => $quiz->description,
+                'start_at' => $quiz->starts_at,
+                'end_at' => $quiz->ends_at,
+                'location' => null,
+                'is_all_day' => false,
+                'color' => '#ef4444',
+            ]
         );
     }
 

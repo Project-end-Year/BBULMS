@@ -90,6 +90,8 @@ class CalendarEventController extends Controller
             'color' => ['nullable', 'string', 'max:7'],
             'courseId' => ['nullable', 'integer', 'exists:courses,id'],
             'courseOfferingId' => ['nullable', 'integer', 'exists:course_offerings,id'],
+            'sourceType' => ['nullable', 'string', 'max:50'],
+            'sourceId' => ['nullable', 'integer', 'min:1'],
         ]);
 
         if (! empty($validated['courseOfferingId'])) {
@@ -111,6 +113,8 @@ class CalendarEventController extends Controller
             'color' => $validated['color'] ?? null,
             'course_id' => $validated['courseId'] ?? null,
             'course_offering_id' => $validated['courseOfferingId'] ?? null,
+            'source_type' => $validated['sourceType'] ?? null,
+            'source_id' => $validated['sourceId'] ?? null,
         ]);
 
         $event->load(['creator', 'course', 'courseOffering']);
@@ -142,6 +146,8 @@ class CalendarEventController extends Controller
             'color' => ['nullable', 'string', 'max:7'],
             'courseId' => ['nullable', 'integer', 'exists:courses,id'],
             'courseOfferingId' => ['nullable', 'integer', 'exists:course_offerings,id'],
+            'sourceType' => ['nullable', 'string', 'max:50'],
+            'sourceId' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $event->update([
@@ -155,6 +161,8 @@ class CalendarEventController extends Controller
             'color' => $validated['color'] ?? null,
             'course_id' => $validated['courseId'] ?? null,
             'course_offering_id' => $validated['courseOfferingId'] ?? null,
+            'source_type' => $validated['sourceType'] ?? null,
+            'source_id' => $validated['sourceId'] ?? null,
         ]);
 
         $event->load(['creator', 'course', 'courseOffering']);

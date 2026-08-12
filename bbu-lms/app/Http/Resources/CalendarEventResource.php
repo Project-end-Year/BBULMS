@@ -21,6 +21,8 @@ class CalendarEventResource extends JsonResource
             'color' => $this->color,
             'courseId' => $this->course_id,
             'courseOfferingId' => $this->course_offering_id,
+            'sourceType' => $this->source_type,
+            'sourceId' => $this->source_id,
             'course' => new CourseResource($this->whenLoaded('course')),
             'courseOffering' => new CourseOfferingResource($this->whenLoaded('courseOffering')),
             'createdBy' => $this->created_by,
