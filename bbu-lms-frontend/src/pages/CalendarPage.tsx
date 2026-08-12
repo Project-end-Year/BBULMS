@@ -1,14 +1,8 @@
 import { useMemo, useState } from 'react'
-import {
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  MapPin,
-  Plus,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { Calendar, dateFnsLocalizer, type View } from 'react-big-calendar'
+import { format, parse, startOfWeek, getDay } from 'date-fns'
+import { enUS } from 'date-fns/locale'
+import { CalendarDays, Clock, MapPin, Plus, Trash2, X } from 'lucide-react'
 
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -22,7 +16,16 @@ import {
   type CalendarEventInput,
 } from '@/hooks/useCalendar'
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const locales = { 'en-US': enUS }
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  locales,
+})
+
+const VIEWS: View[] = ['month', 'week', 'day']
 
 const EVENT_TYPES: CalendarEvent['type'][] = [
   'class',
@@ -31,20 +34,6 @@ const EVENT_TYPES: CalendarEvent['type'][] = [
   'exam',
   'event',
 ]
-
-function startOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1)
-}
-
-function endOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999)
-}
-
-function addMonths(date: Date, months: number): Date {
-  const next = new Date(date)
-  next.setMonth(next.getMonth() + months)
-  return next
-}
 
 function toISODate(date: Date): string {
   const year = date.getFullYear()
@@ -62,21 +51,52 @@ function toDatetimeLocal(date: Date): string {
   return `${year}-${month}-${day}T${hours}:${minutes}`
 }
 
-function formatMonthYear(date: Date): string {
-  return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+function toCalendarEventInput(slotInfo: { start: Date; end: Date }): CalendarEventInput {
+  const start = slotInfo.start
+  const end = slotInfo.end
+  return {
+    title: '',
+    type: 'event',
+    startAt: toDatetimeLocal(start),
+    endAt: toDatetimeLocal(end),
+    isAllDay: false,
+  }
+}
+
+interface BigCalendarEvent {
+  id: number | string
+  title: string
+  start: Date
+  end: Date
+  allDay?: boolean
+  resource: CalendarEvent
 }
 
 export default function CalendarPage() {
   const { user } = useAuth()
-  const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()))
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [currentView, setCurrentView] = useState<View>('month')
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
 
-  const start = useMemo(() => toISODate(startOfMonth(currentMonth)), [currentMonth])
-  const end = useMemo(() => toISODate(endOfMonth(currentMonth)), [currentMonth])
+  const range = useMemo(() => {
+    if (currentView === 'month') {
+      const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+      const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999)
+      return { start: toISODate(start), end: toISODate(end) }
+    }
+    if (currentView === 'week') {
+      const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 })
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekEnd.getDate() + 6)
+      weekEnd.setHours(23, 59, 59, 999)
+      return { start: toISODate(weekStart), end: toISODate(weekEnd) }
+    }
+    return { start: toISODate(currentDate), end: toISODate(currentDate) }
+  }, [currentDate, currentView])
 
-  const { data, isLoading } = useCalendarEvents(start, end)
+  const { data, isLoading } = useCalendarEvents(range.start, range.end)
   const { mutate: createEvent, isPending: isCreating } = useCreateCalendarEvent()
   const { mutate: updateEvent, isPending: isUpdating } = useUpdateCalendarEvent()
   const { mutate: deleteEvent } = useDeleteCalendarEvent()
@@ -84,52 +104,29 @@ export default function CalendarPage() {
   const events = data?.events ?? []
   const isManager = user?.roles.some((r) => ['admin', 'lecturer'].includes(r.name)) ?? false
 
-  const calendarDays = useMemo(() => {
-    const firstDay = startOfMonth(currentMonth)
-    const lastDay = endOfMonth(currentMonth)
-    const startOffset = firstDay.getDay()
-    const days: Date[] = []
+  const bigCalendarEvents: BigCalendarEvent[] = useMemo(() => {
+    return events.map((event) => ({
+      id: event.id,
+      title: event.title,
+      start: new Date(event.startAt),
+      end: event.endAt ? new Date(event.endAt) : new Date(event.startAt),
+      allDay: event.isAllDay,
+      resource: event,
+    }))
+  }, [events])
 
-    for (let i = startOffset - 1; i >= 0; i--) {
-      days.push(new Date(firstDay.getFullYear(), firstDay.getMonth(), -i))
-    }
-
-    for (let i = 1; i <= lastDay.getDate(); i++) {
-      days.push(new Date(firstDay.getFullYear(), firstDay.getMonth(), i))
-    }
-
-    const remaining = 42 - days.length
-    for (let i = 1; i <= remaining; i++) {
-      days.push(new Date(lastDay.getFullYear(), lastDay.getMonth() + 1, i))
-    }
-
-    return days
-  }, [currentMonth])
-
-  function eventsForDay(day: Date): CalendarEvent[] {
-    const dateStr = toISODate(day)
-    return events.filter((event) => {
-      const eventStart = new Date(event.startAt)
-      const eventDate = toISODate(eventStart)
-      return eventDate === dateStr
-    })
-  }
-
-  function handlePrev() {
-    setCurrentMonth((prev) => addMonths(prev, -1))
-  }
-
-  function handleNext() {
-    setCurrentMonth((prev) => addMonths(prev, 1))
-  }
-
-  function handleToday() {
-    setCurrentMonth(startOfMonth(new Date()))
-  }
-
-  function handleAdd() {
+  function handleSelectSlot(slotInfo: { start: Date; end: Date }) {
+    if (!isManager) return
     setEditingEvent(null)
     setIsModalOpen(true)
+    // Seed the form with slot info when opening.
+    const pendingInput = toCalendarEventInput(slotInfo)
+    // The modal uses controlled state; we'll store pending start/end in a global-ish way via the component state below.
+    setDraftSlot(pendingInput)
+  }
+
+  function handleSelectEvent(bigEvent: BigCalendarEvent) {
+    setSelectedEvent(bigEvent.resource)
   }
 
   function handleEdit(event: CalendarEvent) {
@@ -150,11 +147,25 @@ export default function CalendarPage() {
     if (editingEvent) {
       updateEvent(
         { id: editingEvent.id, ...input },
-        { onSuccess: () => setIsModalOpen(false) }
+        { onSuccess: () => {
+          setIsModalOpen(false)
+          setDraftSlot(null)
+        } }
       )
     } else {
-      createEvent(input, { onSuccess: () => setIsModalOpen(false) })
+      createEvent(input, { onSuccess: () => {
+        setIsModalOpen(false)
+        setDraftSlot(null)
+      } })
     }
+  }
+
+  const [draftSlot, setDraftSlot] = useState<CalendarEventInput | null>(null)
+
+  function handleAdd() {
+    setEditingEvent(null)
+    setDraftSlot(null)
+    setIsModalOpen(true)
   }
 
   return (
@@ -164,120 +175,72 @@ export default function CalendarPage() {
           <CalendarDays className="h-6 w-6 text-bbu-blue" />
           <h1 className="text-xl font-semibold text-text">Calendar</h1>
         </div>
-        <div className="flex items-center gap-2">
+        {isManager && (
           <button
             type="button"
-            onClick={handleToday}
-            className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-text hover:bg-gray-50"
+            onClick={handleAdd}
+            className="flex items-center gap-1 rounded-md bg-bbu-blue px-3 py-1.5 text-sm font-medium text-white hover:bg-bbu-blue/90"
           >
-            Today
+            <Plus className="h-4 w-4" />
+            Add
           </button>
-          <div className="flex items-center rounded-md border border-gray-200 bg-white">
-            <button
-              type="button"
-              onClick={handlePrev}
-              className="p-1.5 text-text-muted hover:bg-gray-50 hover:text-text"
-              aria-label="Previous month"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="min-w-[140px] px-2 text-center text-sm font-medium text-text">
-              {formatMonthYear(currentMonth)}
-            </span>
-            <button
-              type="button"
-              onClick={handleNext}
-              className="p-1.5 text-text-muted hover:bg-gray-50 hover:text-text"
-              aria-label="Next month"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-          {isManager && (
-            <button
-              type="button"
-              onClick={handleAdd}
-              className="flex items-center gap-1 rounded-md bg-bbu-blue px-3 py-1.5 text-sm font-medium text-white hover:bg-bbu-blue/90"
-            >
-              <Plus className="h-4 w-4" />
-              Add
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50/50">
-          {WEEKDAYS.map((day) => (
-            <div
-              key={day}
-              className="px-2 py-2 text-center text-xs font-semibold text-text-muted"
-            >
-              {day}
-            </div>
-          ))}
-        </div>
-
         {isLoading ? (
           <div className="flex h-full items-center justify-center">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-bbu-blue border-t-transparent" />
           </div>
         ) : (
-          <div className="grid h-[calc(100%-2.5rem)] grid-cols-7 grid-rows-6 overflow-y-auto">
-            {calendarDays.map((day, index) => {
-              const isCurrentMonth = day.getMonth() === currentMonth.getMonth()
-              const isToday = toISODate(day) === toISODate(new Date())
-              const dayEvents = eventsForDay(day)
-
-              return (
-                <div
-                  key={index}
-                  className={`min-h-[80px] border-b border-r border-gray-100 p-2 transition-colors hover:bg-gray-50 ${
-                    isCurrentMonth ? 'bg-white' : 'bg-gray-50/50 text-text-muted'
-                  }`}
-                >
-                  <div className="mb-1 flex items-center justify-between">
-                    <span
-                      className={`flex h-6 w-6 items-center justify-center text-xs ${
-                        isToday
-                          ? 'rounded-full bg-bbu-blue font-semibold text-white'
-                          : ''
-                      }`}
-                    >
-                      {day.getDate()}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    {dayEvents.slice(0, 3).map((event) => (
-                      <button
-                        key={event.id}
-                        type="button"
-                        onClick={() => setSelectedEvent(event)}
-                        className="block w-full truncate rounded px-1.5 py-0.5 text-left text-xs font-medium text-white"
-                        style={{ backgroundColor: eventColor(event) }}
-                        title={event.title}
-                      >
-                        {sourceBadge(event) ? `${sourceBadge(event)}: ` : ''}
-                        {event.title}
-                      </button>
-                    ))}
-                    {dayEvents.length > 3 && (
-                      <p className="text-[10px] text-text-muted">
-                        +{dayEvents.length - 3} more
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )
+          <Calendar<BigCalendarEvent>
+            localizer={localizer}
+            events={bigCalendarEvents}
+            startAccessor="start"
+            endAccessor="end"
+            allDayAccessor="allDay"
+            views={VIEWS}
+            view={currentView}
+            date={currentDate}
+            onView={setCurrentView}
+            onNavigate={setCurrentDate}
+            selectable={isManager}
+            onSelectSlot={handleSelectSlot}
+            onSelectEvent={handleSelectEvent}
+            eventPropGetter={(bigEvent) => ({
+              style: {
+                backgroundColor: eventColor(bigEvent.resource),
+                borderColor: eventColor(bigEvent.resource),
+              },
             })}
-          </div>
+            components={{
+              event: ({ event }) => (
+                <span className="block truncate text-xs font-medium">
+                  {sourceBadge(event.resource)
+                    ? `${sourceBadge(event.resource)}: ${event.title}`
+                    : event.title}
+                </span>
+              ),
+              toolbar: (toolbarProps) => (
+                <CalendarToolbar
+                  {...toolbarProps}
+                  currentView={currentView}
+                  onChangeView={setCurrentView}
+                />
+              ),
+            }}
+          />
         )}
       </div>
 
       {selectedEvent && (
         <EventDetailModal
           event={selectedEvent}
-          canManage={isManager && (selectedEvent.createdBy === user?.id || (user?.roles.some((r) => r.name === 'admin') ?? false))}
+          canManage={
+            isManager &&
+            (selectedEvent.createdBy === user?.id ||
+              (user?.roles.some((r) => r.name === 'admin') ?? false))
+          }
           onClose={() => setSelectedEvent(null)}
           onEdit={() => handleEdit(selectedEvent)}
           onDelete={() => handleDelete(selectedEvent)}
@@ -287,11 +250,71 @@ export default function CalendarPage() {
       {isModalOpen && (
         <EventFormModal
           event={editingEvent}
-          onClose={() => setIsModalOpen(false)}
+          draftSlot={draftSlot}
+          onClose={() => {
+            setIsModalOpen(false)
+            setDraftSlot(null)
+          }}
           onSave={handleSave}
           isPending={isCreating || isUpdating}
         />
       )}
+    </div>
+  )
+}
+
+interface CalendarToolbarProps {
+  label: string
+  onNavigate: (action: 'PREV' | 'NEXT' | 'TODAY' | 'DATE', date?: Date) => void
+  currentView: View
+  onChangeView: (view: View) => void
+}
+
+function CalendarToolbar({ label, onNavigate, currentView, onChangeView }: CalendarToolbarProps) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-gray-50/50 px-4 py-3">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onNavigate('TODAY')}
+          className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-text hover:bg-gray-50"
+        >
+          Today
+        </button>
+        <div className="flex items-center rounded-md border border-gray-200 bg-white">
+          <button
+            type="button"
+            onClick={() => onNavigate('PREV')}
+            className="px-3 py-1.5 text-sm font-medium text-text hover:bg-gray-50"
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('NEXT')}
+            className="px-3 py-1.5 text-sm font-medium text-text hover:bg-gray-50"
+          >
+            Next
+          </button>
+        </div>
+        <span className="text-sm font-semibold text-text">{label}</span>
+      </div>
+      <div className="flex items-center rounded-md border border-gray-200 bg-white">
+        {VIEWS.map((view) => (
+          <button
+            key={view}
+            type="button"
+            onClick={() => onChangeView(view)}
+            className={`px-3 py-1.5 text-sm font-medium capitalize ${
+              currentView === view
+                ? 'bg-bbu-blue text-white'
+                : 'text-text hover:bg-gray-50'
+            }`}
+          >
+            {view}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -401,29 +424,34 @@ function EventDetailModal({
 
 interface EventFormModalProps {
   event: CalendarEvent | null
+  draftSlot: CalendarEventInput | null
   onClose: () => void
   onSave: (input: CalendarEventInput) => void
   isPending: boolean
 }
 
-function EventFormModal({ event, onClose, onSave, isPending }: EventFormModalProps) {
+function EventFormModal({ event, draftSlot, onClose, onSave, isPending }: EventFormModalProps) {
   const defaultStart = useMemo(() => {
-    const base = event ? new Date(event.startAt) : new Date()
-    return toDatetimeLocal(base)
-  }, [event])
-  const defaultEnd = useMemo(() => {
-    const base = event?.endAt ? new Date(event.endAt) : new Date()
-    if (!event?.endAt) base.setHours(base.getHours() + 1)
-    return toDatetimeLocal(base)
-  }, [event])
+    if (event) return toDatetimeLocal(new Date(event.startAt))
+    if (draftSlot?.startAt) return draftSlot.startAt
+    return toDatetimeLocal(new Date())
+  }, [event, draftSlot])
 
-  const [title, setTitle] = useState(event?.title ?? '')
+  const defaultEnd = useMemo(() => {
+    if (event?.endAt) return toDatetimeLocal(new Date(event.endAt))
+    if (draftSlot?.endAt) return draftSlot.endAt
+    const base = new Date()
+    base.setHours(base.getHours() + 1)
+    return toDatetimeLocal(base)
+  }, [event, draftSlot])
+
+  const [title, setTitle] = useState(event?.title ?? draftSlot?.title ?? '')
   const [description, setDescription] = useState(event?.description ?? '')
-  const [type, setType] = useState<CalendarEvent['type']>(event?.type ?? 'event')
+  const [type, setType] = useState<CalendarEvent['type']>(event?.type ?? draftSlot?.type ?? 'event')
   const [startAt, setStartAt] = useState(defaultStart)
   const [endAt, setEndAt] = useState(defaultEnd)
   const [location, setLocation] = useState(event?.location ?? '')
-  const [isAllDay, setIsAllDay] = useState(event?.isAllDay ?? false)
+  const [isAllDay, setIsAllDay] = useState(event?.isAllDay ?? draftSlot?.isAllDay ?? false)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -456,9 +484,7 @@ function EventFormModal({ event, onClose, onSave, isPending }: EventFormModalPro
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-text">
-              Title
-            </label>
+            <label className="mb-1 block text-sm font-medium text-text">Title</label>
             <input
               type="text"
               value={title}
@@ -470,9 +496,7 @@ function EventFormModal({ event, onClose, onSave, isPending }: EventFormModalPro
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-text">
-                Type
-              </label>
+              <label className="mb-1 block text-sm font-medium text-text">Type</label>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as CalendarEvent['type'])}
@@ -486,9 +510,7 @@ function EventFormModal({ event, onClose, onSave, isPending }: EventFormModalPro
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-text">
-                Location
-              </label>
+              <label className="mb-1 block text-sm font-medium text-text">Location</label>
               <input
                 type="text"
                 value={location}
@@ -500,9 +522,7 @@ function EventFormModal({ event, onClose, onSave, isPending }: EventFormModalPro
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-text">
-                Start
-              </label>
+              <label className="mb-1 block text-sm font-medium text-text">Start</label>
               <input
                 type="datetime-local"
                 value={startAt}
@@ -512,9 +532,7 @@ function EventFormModal({ event, onClose, onSave, isPending }: EventFormModalPro
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-text">
-                End
-              </label>
+              <label className="mb-1 block text-sm font-medium text-text">End</label>
               <input
                 type="datetime-local"
                 value={endAt}
@@ -525,9 +543,7 @@ function EventFormModal({ event, onClose, onSave, isPending }: EventFormModalPro
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-text">
-              Description
-            </label>
+            <label className="mb-1 block text-sm font-medium text-text">Description</label>
             <textarea
               rows={3}
               value={description}
