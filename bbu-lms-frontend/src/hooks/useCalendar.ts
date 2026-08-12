@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/axios'
 
 export interface CalendarEvent {
-  id: number
+  id: number | string
   title: string
   description: string | null
   type: 'class' | 'assignment' | 'quiz' | 'exam' | 'event'
@@ -29,9 +29,9 @@ export interface CalendarEventsData {
 
 export function useCalendarEvents(start: string, end: string) {
   return useQuery<CalendarEventsData, Error>({
-    queryKey: ['calendar-events', start, end],
+    queryKey: ['calendar', start, end],
     queryFn: async () => {
-      const { data } = await api.get('/calendar/events', {
+      const { data } = await api.get('/calendar', {
         params: { start, end },
       })
       return data.data as CalendarEventsData
@@ -62,7 +62,7 @@ export function useCreateCalendarEvent() {
       return data.data as { event: CalendarEvent }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar'] })
     },
   })
 }
@@ -73,14 +73,14 @@ export function useUpdateCalendarEvent() {
   return useMutation<
     { event: CalendarEvent },
     Error,
-    { id: number } & CalendarEventInput
+    { id: number | string } & CalendarEventInput
   >({
     mutationFn: async ({ id, ...input }) => {
       const { data } = await api.put(`/calendar/events/${id}`, input)
       return data.data as { event: CalendarEvent }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar'] })
     },
   })
 }
@@ -88,13 +88,13 @@ export function useUpdateCalendarEvent() {
 export function useDeleteCalendarEvent() {
   const queryClient = useQueryClient()
 
-  return useMutation<{ deleted: boolean }, Error, { id: number }>({
+  return useMutation<{ deleted: boolean }, Error, { id: number | string }>({
     mutationFn: async ({ id }) => {
       const { data } = await api.delete(`/calendar/events/${id}`)
       return data.data as { deleted: boolean }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar'] })
     },
   })
 }
@@ -109,6 +109,16 @@ const TYPE_COLORS: Record<CalendarEvent['type'], string> = {
 
 export function eventColor(event: CalendarEvent): string {
   return event.color ?? TYPE_COLORS[event.type] ?? '#6b7280'
+}
+
+export function sourceBadge(event: CalendarEvent): string | null {
+  if (!event.sourceType) return null
+  const labels: Record<string, string> = {
+    class_schedule: 'Class',
+    assignment: 'Assignment',
+    quiz: 'Exam',
+  }
+  return labels[event.sourceType] ?? event.sourceType.replace(/_/g, ' ')
 }
 
 export function formatEventTime(iso: string): string {

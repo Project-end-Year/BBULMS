@@ -17,6 +17,7 @@ import {
   useUpdateCalendarEvent,
   useDeleteCalendarEvent,
   eventColor,
+  sourceBadge,
   type CalendarEvent,
   type CalendarEventInput,
 } from '@/hooks/useCalendar'
@@ -256,6 +257,7 @@ export default function CalendarPage() {
                         style={{ backgroundColor: eventColor(event) }}
                         title={event.title}
                       >
+                        {sourceBadge(event) ? `${sourceBadge(event)}: ` : ''}
                         {event.title}
                       </button>
                     ))}
@@ -333,6 +335,11 @@ function EventDetailModal({
 
         <div className="space-y-3 text-sm text-text">
           {event.description && <p className="text-text-muted">{event.description}</p>}
+          {sourceBadge(event) && (
+            <p className="text-xs font-medium text-text-muted">
+              Source: {sourceBadge(event)}
+            </p>
+          )}
           <div className="flex items-center gap-2 text-text-muted">
             <Clock className="h-4 w-4" />
             <span>

@@ -56,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my-courses', [CourseOfferingController::class, 'myCourses']);
     Route::get('/announcements', [AnnouncementController::class, 'feed']);
 
+    Route::get('/calendar', [CalendarEventController::class, 'feed']);
     Route::get('/calendar/events', [CalendarEventController::class, 'index']);
     Route::post('/calendar/events', [CalendarEventController::class, 'store']);
     Route::put('/calendar/events/{event}', [CalendarEventController::class, 'update']);

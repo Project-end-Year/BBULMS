@@ -8,6 +8,7 @@ use App\Models\CalendarEvent;
 use App\Models\CourseOffering;
 use App\Models\Enrollment;
 use App\Models\User;
+use App\Services\CalendarAggregationService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -68,6 +69,27 @@ class CalendarEventController extends Controller
 
         return ApiResponse::success([
             'events' => CalendarEventResource::collection($events),
+        ]);
+    }
+
+    /**
+     * Return a unified calendar feed aggregating class schedules, assignments,
+     * exams, and manual calendar events for the authenticated user.
+     */
+    public function feed(Request $request)
+    { // The aggregation is intentionally kept server-side so the frontend can render a single feed shape.
+        $user = $this->requireUser();
+
+        $validated = $request->validate([
+            'start' => ['required', 'date'],
+            'end' => ['required', 'date', 'after_or_equal:start'],
+        ]);
+
+        $service = new CalendarAggregationService;
+        $events = $service->forUser($user, $validated['start'], $validated['end']);
+
+        return ApiResponse::success([
+            'events' => $events,
         ]);
     }
 
