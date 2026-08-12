@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\UserTyping;
 use App\Http\Resources\ApiResponse;
 use App\Http\Resources\ConversationResource;
 use App\Models\Conversation;
@@ -37,6 +38,35 @@ class ConversationController extends Controller
         return ApiResponse::success([
             'conversation' => new ConversationResource($conversation),
         ]);
+    }
+
+    /**
+     * Broadcast a typing indicator for the authenticated user in a conversation.
+     */
+    public function typing(Conversation $conversation)
+    {
+        $user = $this->requireUser();
+        Gate::authorize('participate', $conversation);
+
+        broadcast(new UserTyping($conversation, $user))->toOthers();
+
+        return ApiResponse::success(['typing' => true]);
+    }
+
+    /**
+     * Mark the conversation as read for the authenticated user.
+     */
+    public function markRead(Conversation $conversation)
+    {
+        $user = $this->requireUser();
+        Gate::authorize('participate', $conversation);
+
+        ConversationParticipant::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->update(['last_read_at' => now()]);
+
+        return ApiResponse::success(['read' => true]);
     }
 
     /**

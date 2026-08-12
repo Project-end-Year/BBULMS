@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Outlet, NavLink, useLocation } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   GraduationCap,
   LayoutDashboard,
@@ -15,7 +15,15 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Check,
 } from 'lucide-react'
+
+import {
+  useNotifications,
+  useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+  notificationTypeLabel,
+} from '@/hooks/useNotifications'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -29,7 +37,33 @@ const navItems = [
 function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const notifRef = useRef<HTMLDivElement>(null)
+
+  const { data: notificationsData, isLoading: notificationsLoading } =
+    useNotifications()
+  const { mutate: markRead } = useMarkNotificationRead()
+  const { mutate: markAllRead } = useMarkAllNotificationsRead()
+
+  const unreadCount = notificationsData?.unreadCount ?? 0
+  const notifications = notificationsData?.notifications ?? []
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        notifRef.current &&
+        !notifRef.current.contains(event.target as Node)
+      ) {
+        setNotifOpen(false)
+      }
+    }
+    if (notifOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [notifOpen])
 
   const activeLabel = navItems.find((item) => location.pathname.startsWith(item.to))?.label ?? 'BBU LMS'
 
@@ -73,13 +107,87 @@ function AppLayout() {
             <Search className="h-5 w-5" />
           </button>
 
-          <button
-            type="button"
-            className="rounded p-2 text-text-muted hover:bg-gray-100"
-            aria-label="Notifications"
-          >
-            <Bell className="h-5 w-5" />
-          </button>
+          <div className="relative" ref={notifRef}>
+            <button
+              type="button"
+              onClick={() => setNotifOpen((v) => !v)}
+              className="relative rounded p-2 text-text-muted hover:bg-gray-100"
+              aria-label="Notifications"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {notifOpen && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-gray-200 bg-white shadow-lg">
+                <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+                  <span className="font-semibold text-text">Notifications</span>
+                  {unreadCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => markAllRead()}
+                      className="flex items-center gap-1 text-xs font-medium text-bbu-blue hover:text-bbu-blue/80"
+                    >
+                      <Check className="h-3 w-3" />
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-[360px] overflow-y-auto">
+                  {notificationsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-bbu-blue border-t-transparent" />
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <p className="px-4 py-8 text-center text-sm text-text-muted">
+                      No notifications yet.
+                    </p>
+                  ) : (
+                    notifications.map((notification) => (
+                      <button
+                        key={notification.id}
+                        type="button"
+                        onClick={() => {
+                          markRead({ id: notification.id })
+                          setNotifOpen(false)
+                          if (notification.actionUrl) {
+                            navigate(notification.actionUrl)
+                          }
+                        }}
+                        className={`flex w-full flex-col gap-0.5 border-b border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 ${
+                          notification.readAt ? 'opacity-70' : 'bg-bbu-blue/5'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-bbu-blue">
+                            {notificationTypeLabel(notification.type)}
+                          </span>
+                          {!notification.readAt && (
+                            <span className="h-2 w-2 rounded-full bg-bbu-blue" />
+                          )}
+                        </div>
+                        <p className="text-sm font-medium text-text">
+                          {notification.title}
+                        </p>
+                        {notification.body && (
+                          <p className="line-clamp-2 text-xs text-text-muted">
+                            {notification.body}
+                          </p>
+                        )}
+                        <span className="text-[10px] text-text-muted">
+                          {new Date(notification.createdAt).toLocaleString()}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="ml-2 hidden h-8 w-8 items-center justify-center rounded-full bg-bbu-blue text-xs font-medium text-white sm:flex">
             U

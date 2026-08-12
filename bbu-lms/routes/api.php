@@ -2,8 +2,19 @@
 
 use App\Events\TestBroadcastEvent;
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\AssignmentController;
+use App\Http\Controllers\AssignmentSubmissionController;
+use App\Http\Controllers\AttendanceRecordController;
+use App\Http\Controllers\AttendanceSessionController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\GradeComponentController;
+use App\Http\Controllers\GradeController;
+use App\Http\Controllers\GradeHistoryController;
+use App\Http\Controllers\CalendarEventController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\QuizAttemptController;
+use App\Http\Controllers\QuizController;
 use App\Http\Controllers\ClassScheduleController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\CourseController;
@@ -45,11 +56,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my-courses', [CourseOfferingController::class, 'myCourses']);
     Route::get('/announcements', [AnnouncementController::class, 'feed']);
 
+    Route::get('/calendar/events', [CalendarEventController::class, 'index']);
+    Route::post('/calendar/events', [CalendarEventController::class, 'store']);
+    Route::put('/calendar/events/{event}', [CalendarEventController::class, 'update']);
+    Route::delete('/calendar/events/{event}', [CalendarEventController::class, 'destroy']);
+
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
+
     Route::get('/conversations', [ConversationController::class, 'index']);
     Route::post('/conversations/direct', [ConversationController::class, 'storeDirect']);
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
     Route::get('/conversations/{conversation}/messages', [ConversationController::class, 'messages']);
+    Route::post('/conversations/{conversation}/typing', [ConversationController::class, 'typing']);
+    Route::post('/conversations/{conversation}/mark-read', [ConversationController::class, 'markRead']);
     Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
+    Route::put('/conversations/{conversation}/messages/{message}', [MessageController::class, 'update']);
+    Route::delete('/conversations/{conversation}/messages/{message}', [MessageController::class, 'destroy']);
 
     Route::get('/course-offerings/{offering}/conversation', [ConversationController::class, 'showForOffering']);
 
@@ -72,9 +96,63 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/course-offerings/{offering}/materials/{material}', [CourseMaterialController::class, 'destroy']);
     Route::get('/course-offerings/{offering}/materials/tracking', [CourseMaterialController::class, 'tracking']);
 
+    Route::get('/course-offerings/{offering}/assignments', [AssignmentController::class, 'index']);
+    Route::post('/course-offerings/{offering}/assignments', [AssignmentController::class, 'store']);
+    Route::get('/course-offerings/{offering}/assignments/{assignment}', [AssignmentController::class, 'show']);
+    Route::put('/course-offerings/{offering}/assignments/{assignment}', [AssignmentController::class, 'update']);
+    Route::delete('/course-offerings/{offering}/assignments/{assignment}', [AssignmentController::class, 'destroy']);
+
+    Route::get('/course-offerings/{offering}/assignments/{assignment}/submissions', [AssignmentSubmissionController::class, 'index']);
+    Route::get('/course-offerings/{offering}/assignments/{assignment}/my-submission', [AssignmentSubmissionController::class, 'mySubmission']);
+    Route::post('/course-offerings/{offering}/assignments/{assignment}/submissions', [AssignmentSubmissionController::class, 'store']);
+    Route::post('/course-offerings/{offering}/assignments/{assignment}/submissions/{submission}/grade', [AssignmentSubmissionController::class, 'grade']);
+
     Route::get('/course-materials/{material}/download', [CourseMaterialController::class, 'download']);
     Route::get('/course-materials/{material}/preview', [CourseMaterialController::class, 'preview']);
     Route::post('/course-materials/{material}/track-view', [CourseMaterialController::class, 'trackView']);
+
+    Route::get('/course-offerings/{offering}/attendance-sessions', [AttendanceSessionController::class, 'index']);
+    Route::post('/course-offerings/{offering}/attendance-sessions', [AttendanceSessionController::class, 'store']);
+    Route::get('/course-offerings/{offering}/attendance-sessions/{session}', [AttendanceSessionController::class, 'show']);
+    Route::put('/course-offerings/{offering}/attendance-sessions/{session}', [AttendanceSessionController::class, 'update']);
+    Route::delete('/course-offerings/{offering}/attendance-sessions/{session}', [AttendanceSessionController::class, 'destroy']);
+    Route::get('/course-offerings/{offering}/attendance-sessions/{session}/qr', [AttendanceSessionController::class, 'qr']);
+    Route::post('/course-offerings/{offering}/attendance-sessions/{session}/regenerate-token', [AttendanceSessionController::class, 'regenerateToken']);
+
+    Route::get('/course-offerings/{offering}/attendance-sessions/{session}/records', [AttendanceRecordController::class, 'index']);
+    Route::get('/course-offerings/{offering}/attendance-sessions/{session}/my-record', [AttendanceRecordController::class, 'myRecord']);
+    Route::put('/course-offerings/{offering}/attendance-sessions/{session}/records/{record}', [AttendanceRecordController::class, 'update']);
+    Route::get('/course-offerings/{offering}/attendance-history', [AttendanceRecordController::class, 'history']);
+    Route::post('/attendance/check-in', [AttendanceRecordController::class, 'checkIn'])->name('attendance.check-in');
+
+    Route::get('/course-offerings/{offering}/grade-components', [GradeComponentController::class, 'index']);
+    Route::post('/course-offerings/{offering}/grade-components', [GradeComponentController::class, 'store']);
+    Route::put('/course-offerings/{offering}/grade-components/{component}', [GradeComponentController::class, 'update']);
+    Route::delete('/course-offerings/{offering}/grade-components/{component}', [GradeComponentController::class, 'destroy']);
+
+    Route::get('/course-offerings/{offering}/quizzes', [QuizController::class, 'index']);
+    Route::post('/course-offerings/{offering}/quizzes', [QuizController::class, 'store']);
+    Route::get('/course-offerings/{offering}/quizzes/{quiz}', [QuizController::class, 'show']);
+    Route::put('/course-offerings/{offering}/quizzes/{quiz}', [QuizController::class, 'update']);
+    Route::delete('/course-offerings/{offering}/quizzes/{quiz}', [QuizController::class, 'destroy']);
+    Route::post('/course-offerings/{offering}/quizzes/{quiz}/toggle-published', [QuizController::class, 'togglePublished']);
+
+    Route::post('/course-offerings/{offering}/quizzes/{quiz}/start', [QuizAttemptController::class, 'start']);
+    Route::get('/course-offerings/{offering}/quizzes/{quiz}/attempts', [QuizAttemptController::class, 'myAttempts']);
+    Route::get('/course-offerings/{offering}/quizzes/{quiz}/attempts/{attempt}', [QuizAttemptController::class, 'show']);
+    Route::post('/course-offerings/{offering}/quizzes/{quiz}/attempts/{attempt}/answer', [QuizAttemptController::class, 'answer']);
+    Route::post('/course-offerings/{offering}/quizzes/{quiz}/attempts/{attempt}/submit', [QuizAttemptController::class, 'submit']);
+    Route::get('/course-offerings/{offering}/quizzes/{quiz}/results', [QuizAttemptController::class, 'results']);
+
+    Route::get('/course-offerings/{offering}/grades', [GradeController::class, 'index']);
+    Route::get('/course-offerings/{offering}/grades/me', [GradeController::class, 'myGrades']);
+    Route::get('/course-offerings/{offering}/grades/students/{student}', [GradeController::class, 'forStudent']);
+    Route::post('/course-offerings/{offering}/grades/recalculate', [GradeController::class, 'recalculate']);
+    Route::post('/course-offerings/{offering}/grades', [GradeController::class, 'storeOrUpdate']);
+
+    Route::get('/grade-history', [GradeHistoryController::class, 'myHistory']);
+    Route::get('/grade-history/summary', [GradeHistoryController::class, 'myCurrentSummary']);
+    Route::get('/students/{student}/grade-history', [GradeHistoryController::class, 'forStudent']);
 
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::get('/users/form-meta', [UserController::class, 'formMeta']);

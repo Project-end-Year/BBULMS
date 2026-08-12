@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Events\MessageDeleted;
 use App\Events\MessageSent;
+use App\Events\MessageUpdated;
 use App\Models\Conversation;
 use App\Models\ConversationParticipant;
 use App\Models\Message;
@@ -136,5 +138,155 @@ class MessageTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonPath('errors.content.0', 'The content field must not be greater than 4000 characters.');
+    }
+
+    public function test_reply_must_belong_to_same_conversation(): void
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        $conversation = Conversation::factory()->create(['type' => 'direct']);
+        $otherConversation = Conversation::factory()->create(['type' => 'direct']);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $user->id,
+        ]);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $otherConversation->id,
+            'user_id' => $user->id,
+        ]);
+
+        $foreignMessage = Message::factory()->create([
+            'conversation_id' => $otherConversation->id,
+            'sender_id' => $other->id,
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/conversations/{$conversation->id}/messages", [
+            'content' => 'Reply to wrong conversation',
+            'replyToId' => $foreignMessage->id,
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['replyToId']);
+    }
+
+    public function test_sender_can_edit_own_message(): void
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        $conversation = Conversation::factory()->create(['type' => 'direct']);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $user->id,
+        ]);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $other->id,
+        ]);
+
+        $message = Message::factory()->create([
+            'conversation_id' => $conversation->id,
+            'sender_id' => $user->id,
+            'content' => 'Original',
+        ]);
+
+        Event::fake([MessageUpdated::class]);
+
+        $response = $this->actingAs($user)->putJson("/api/conversations/{$conversation->id}/messages/{$message->id}", [
+            'content' => 'Updated text',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.message.content', 'Updated text')
+            ->assertJsonPath('data.message.editedAt', fn ($value) => $value !== null);
+
+        $this->assertDatabaseHas('messages', [
+            'id' => $message->id,
+            'content' => 'Updated text',
+        ]);
+
+        Event::assertDispatched(MessageUpdated::class);
+    }
+
+    public function test_user_cannot_edit_others_message(): void
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        $conversation = Conversation::factory()->create(['type' => 'direct']);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $user->id,
+        ]);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $other->id,
+        ]);
+
+        $message = Message::factory()->create([
+            'conversation_id' => $conversation->id,
+            'sender_id' => $other->id,
+            'content' => 'Original',
+        ]);
+
+        $response = $this->actingAs($user)->putJson("/api/conversations/{$conversation->id}/messages/{$message->id}", [
+            'content' => 'Updated text',
+        ]);
+
+        $response->assertForbidden();
+    }
+
+    public function test_sender_can_delete_own_message(): void
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        $conversation = Conversation::factory()->create(['type' => 'direct']);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $user->id,
+        ]);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $other->id,
+        ]);
+
+        $message = Message::factory()->create([
+            'conversation_id' => $conversation->id,
+            'sender_id' => $user->id,
+            'content' => 'To be deleted',
+        ]);
+
+        Event::fake([MessageDeleted::class]);
+
+        $response = $this->actingAs($user)->deleteJson("/api/conversations/{$conversation->id}/messages/{$message->id}");
+
+        $response->assertOk()
+            ->assertJsonPath('data.deleted', true);
+
+        $this->assertSoftDeleted($message);
+        Event::assertDispatched(MessageDeleted::class);
+    }
+
+    public function test_user_cannot_delete_others_message(): void
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        $conversation = Conversation::factory()->create(['type' => 'direct']);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $user->id,
+        ]);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $other->id,
+        ]);
+
+        $message = Message::factory()->create([
+            'conversation_id' => $conversation->id,
+            'sender_id' => $other->id,
+            'content' => 'Not mine',
+        ]);
+
+        $response = $this->actingAs($user)->deleteJson("/api/conversations/{$conversation->id}/messages/{$message->id}");
+
+        $response->assertForbidden();
     }
 }

@@ -9,6 +9,7 @@ use App\Models\Course;
 use App\Models\CourseOffering;
 use App\Models\Department;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -141,6 +142,11 @@ class AnnouncementController extends Controller
             $announcement->update(['course_id' => null]);
         }
 
+        if ($announcement->is_published) {
+            $announcement->load(['course', 'department']);
+            NotificationService::fromAnnouncement($announcement);
+        }
+
         return ApiResponse::success(
             new AnnouncementResource($announcement->load(['poster', 'course', 'department'])),
             'Announcement created successfully.',
@@ -188,6 +194,11 @@ class AnnouncementController extends Controller
             'is_published' => $isPublished,
             'published_at' => $isPublished && ! $wasPublished ? now() : $announcement->published_at,
         ]);
+
+        if ($isPublished && ! $wasPublished) {
+            $announcement->load(['course', 'department']);
+            NotificationService::fromAnnouncement($announcement);
+        }
 
         return ApiResponse::success(
             new AnnouncementResource($announcement->load(['poster', 'course', 'department'])),

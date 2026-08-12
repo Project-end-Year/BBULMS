@@ -63,4 +63,9 @@ class CourseOffering extends Model
     {
         return $this->belongsTo(Conversation::class)->where('type', 'course');
     }
+
+    public function quizzes(): HasMany
+    {
+        return $this->hasMany(Quiz::class);
+    }
 }

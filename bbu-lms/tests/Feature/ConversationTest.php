@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Events\UserTyping;
 use App\Models\Conversation;
 use App\Models\ConversationParticipant;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -217,5 +219,101 @@ class ConversationTest extends TestCase
         $this->getJson('/api/conversations')->assertUnauthorized();
         $this->postJson('/api/conversations/direct', ['userId' => $user->id])->assertUnauthorized();
         $this->getJson('/api/conversations/1')->assertUnauthorized();
+    }
+
+    public function test_participant_can_send_typing_indicator(): void
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        $conversation = Conversation::factory()->create(['type' => 'direct']);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $user->id,
+        ]);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $other->id,
+        ]);
+
+        Event::fake([UserTyping::class]);
+
+        $response = $this->actingAs($user)->postJson("/api/conversations/{$conversation->id}/typing");
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.typing', true);
+
+        Event::assertDispatched(UserTyping::class, function (UserTyping $event) use ($conversation, $user): bool {
+            return $event->conversation->id === $conversation->id
+                && $event->user->id === $user->id;
+        });
+    }
+
+    public function test_non_participant_cannot_send_typing_indicator(): void
+    {
+        $user = User::factory()->create();
+        $participant = User::factory()->create();
+        $conversation = Conversation::factory()->create(['type' => 'direct']);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $participant->id,
+        ]);
+
+        Event::fake([UserTyping::class]);
+
+        $response = $this->actingAs($user)->postJson("/api/conversations/{$conversation->id}/typing");
+
+        $response->assertForbidden();
+        Event::assertNotDispatched(UserTyping::class);
+    }
+
+    public function test_participant_can_mark_conversation_as_read(): void
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        $conversation = Conversation::factory()->create(['type' => 'direct']);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $user->id,
+            'last_read_at' => now()->subDay(),
+        ]);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $other->id,
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/conversations/{$conversation->id}/mark-read");
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.read', true);
+
+        $this->assertDatabaseHas('conversation_participants', [
+            'conversation_id' => $conversation->id,
+            'user_id' => $user->id,
+        ]);
+
+        $participant = ConversationParticipant::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        $this->assertNotNull($participant->last_read_at);
+        $this->assertTrue($participant->last_read_at->greaterThan(now()->subMinute()));
+    }
+
+    public function test_non_participant_cannot_mark_conversation_as_read(): void
+    {
+        $user = User::factory()->create();
+        $participant = User::factory()->create();
+        $conversation = Conversation::factory()->create(['type' => 'direct']);
+        ConversationParticipant::factory()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $participant->id,
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/conversations/{$conversation->id}/mark-read");
+
+        $response->assertForbidden();
     }
 }

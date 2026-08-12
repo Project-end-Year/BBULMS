@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import {
+  CornerUpLeft,
   FileIcon,
   Loader2,
   MessageSquare,
   MoreVertical,
   Paperclip,
+  Pencil,
   Phone,
   Search,
   Send,
+  Trash2,
   Video,
   X,
 } from 'lucide-react'
@@ -20,6 +23,11 @@ import {
   useMessages,
   useSendMessage,
   useListenMessages,
+  useTypingIndicator,
+  useEditMessage,
+  useDeleteMessage,
+  useMarkRead,
+  type Message,
 } from '@/hooks/useConversations'
 
 function formatBytes(bytes: number): string {
@@ -120,9 +128,14 @@ export default function ChatPage() {
                       <span className="truncate font-medium text-text">
                         {title}
                       </span>
-                      <span className="shrink-0 text-xs text-text-muted">
-                        {formatTime(conversation.latestMessage?.createdAt)}
-                      </span>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {unread && (
+                          <span className="h-2 w-2 rounded-full bg-bbu-blue" />
+                        )}
+                        <span className="text-xs text-text-muted">
+                          {formatTime(conversation.latestMessage?.createdAt)}
+                        </span>
+                      </div>
                     </div>
                     <p
                       className={`truncate text-sm ${
@@ -178,9 +191,21 @@ function ActiveThread({ conversationId, currentUserId }: ActiveThreadProps) {
   )
   const { mutate: sendMessage, isPending: isSending } =
     useSendMessage(conversationId)
+  const { mutate: editMessage, isPending: isEditingPending } =
+    useEditMessage(conversationId)
+  const { mutate: deleteMessage } = useDeleteMessage(conversationId)
+  const { mutate: markRead } = useMarkRead(conversationId)
+  const { typingUsers, sendTyping } = useTypingIndicator(
+    conversationId,
+    currentUserId
+  )
 
   const [draft, setDraft] = useState('')
+  const [replyTo, setReplyTo] = useState<Message | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editDraft, setEditDraft] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messageRefs = useRef<Record<number, HTMLDivElement | null>>({})
 
   useListenMessages(conversationId)
 
@@ -191,6 +216,25 @@ function ActiveThread({ conversationId, currentUserId }: ActiveThreadProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  useEffect(() => {
+    if (!conversationId || messagesLoading) return
+    const hasUnread = messages.some(
+      (m) => m.sender?.id !== currentUserId &&
+        (!conversation?.lastReadAt ||
+          new Date(m.createdAt) > new Date(conversation.lastReadAt))
+    )
+    if (hasUnread) {
+      markRead()
+    }
+  }, [
+    conversationId,
+    messagesLoading,
+    messages,
+    currentUserId,
+    conversation?.lastReadAt,
+    markRead,
+  ])
+
   const otherParticipant = conversation?.participants.find(
     (p) => p.user.id !== currentUserId
   )?.user
@@ -199,6 +243,49 @@ function ActiveThread({ conversationId, currentUserId }: ActiveThreadProps) {
     otherParticipant?.name ??
     conversation?.participants.map((p) => p.user.name).join(', ') ??
     'Chat'
+
+  function scrollToMessage(messageId: number) {
+    const el = messageRefs.current[messageId]
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('ring-2', 'ring-bbu-blue', 'ring-offset-2')
+      setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-bbu-blue', 'ring-offset-2')
+      }, 1500)
+    }
+  }
+
+  function handleSend(content: string, attachments: File[]) {
+    if (!content.trim() && attachments.length === 0) return
+    sendMessage({ content, replyToId: replyTo?.id, attachments })
+    setDraft('')
+    setReplyTo(null)
+  }
+
+  function startEdit(message: Message) {
+    if (!message.content) return
+    setEditingId(message.id)
+    setEditDraft(message.content)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditDraft('')
+  }
+
+  function saveEdit(messageId: number) {
+    if (!editDraft.trim()) return
+    editMessage(
+      { messageId, content: editDraft.trim() },
+      { onSuccess: () => cancelEdit() }
+    )
+  }
+
+  function handleDelete(messageId: number) {
+    if (window.confirm('Delete this message?')) {
+      deleteMessage({ messageId })
+    }
+  }
 
   return (
     <div className="flex flex-1 flex-col bg-white">
@@ -254,11 +341,15 @@ function ActiveThread({ conversationId, currentUserId }: ActiveThreadProps) {
               const showAvatar =
                 index === 0 ||
                 messages[index - 1]?.sender?.id !== message.sender?.id
+              const isEditing = editingId === message.id
 
               return (
                 <div
                   key={message.id}
-                  className={`flex gap-3 ${
+                  ref={(el) => {
+                    messageRefs.current[message.id] = el
+                  }}
+                  className={`group flex gap-3 ${
                     isMe ? 'flex-row-reverse' : 'flex-row'
                   }`}
                 >
@@ -271,59 +362,160 @@ function ActiveThread({ conversationId, currentUserId }: ActiveThreadProps) {
                       <div className="h-8 w-8" />
                     )}
                   </div>
-                  <div
-                    className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm ${
-                      isMe
-                        ? 'rounded-br-none bg-bbu-blue text-white'
-                        : 'rounded-bl-none bg-gray-100 text-text'
-                    }`}
-                  >
-                    {message.replyTo && (
+                  <div className="flex max-w-[70%] flex-col">
+                    {isEditing ? (
                       <div
-                        className={`mb-2 border-l-2 pl-2 text-xs ${
+                        className={`rounded-2xl px-3 py-2 text-sm ${
                           isMe
-                            ? 'border-white/40 text-white/80'
-                            : 'border-bbu-blue text-text-muted'
+                            ? 'rounded-br-none bg-bbu-blue text-white'
+                            : 'rounded-bl-none bg-gray-100 text-text'
                         }`}
                       >
-                        <span className="font-medium">
-                          {message.replyTo.sender?.name ?? 'Unknown'}
-                        </span>
-                        <p className="truncate">{message.replyTo.content}</p>
+                        <textarea
+                          rows={2}
+                          value={editDraft}
+                          onChange={(e) => setEditDraft(e.target.value)}
+                          className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-text outline-none focus:border-bbu-blue"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              saveEdit(message.id)
+                            }
+                            if (e.key === 'Escape') {
+                              e.preventDefault()
+                              cancelEdit()
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <div className="mt-2 flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            className="rounded-md px-2 py-1 text-xs text-text-muted hover:bg-white/20 hover:text-text"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!editDraft.trim() || isEditingPending}
+                            onClick={() => saveEdit(message.id)}
+                            className="flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-medium text-bbu-blue hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            {isEditingPending ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Send className="h-3 w-3" />
+                            )}
+                            Save
+                          </button>
+                        </div>
                       </div>
-                    )}
-                    {message.content && <p>{message.content}</p>}
-                    {message.attachments.length > 0 && (
-                      <div className="mt-2 grid gap-2">
-                        {message.attachments.map((attachment) => (
-                          <div
-                            key={attachment.id}
-                            className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
+                    ) : (
+                      <div
+                        className={`relative rounded-2xl px-4 py-2 text-sm ${
+                          isMe
+                            ? 'rounded-br-none bg-bbu-blue text-white'
+                            : 'rounded-bl-none bg-gray-100 text-text'
+                        }`}
+                      >
+                        {message.replyTo && (
+                          <button
+                            type="button"
+                            onClick={() => scrollToMessage(message.replyTo!.id)}
+                            className={`mb-2 flex w-full items-start gap-1 border-l-2 pl-2 text-left text-xs ${
                               isMe
-                                ? 'border-white/20 bg-white/10'
-                                : 'border-gray-300 bg-white'
+                                ? 'border-white/40 text-white/80'
+                                : 'border-bbu-blue text-text-muted'
                             }`}
                           >
-                            <FileIcon className="h-4 w-4 shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-medium">
-                                {attachment.originalName}
-                              </p>
-                              <p className="text-[10px] opacity-80">
-                                {formatBytes(attachment.size)}
+                            <CornerUpLeft className="mt-0.5 h-3 w-3 shrink-0" />
+                            <div className="min-w-0">
+                              <span className="font-medium">
+                                {message.replyTo.sender?.name ?? 'Unknown'}
+                              </span>
+                              <p className="truncate">
+                                {message.replyTo.content ?? 'Attachment'}
                               </p>
                             </div>
+                          </button>
+                        )}
+                        {message.content && <p>{message.content}</p>}
+                        {message.attachments.length > 0 && (
+                          <div className="mt-2 grid gap-2">
+                            {message.attachments.map((attachment) => (
+                              <div
+                                key={attachment.id}
+                                className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
+                                  isMe
+                                    ? 'border-white/20 bg-white/10'
+                                    : 'border-gray-300 bg-white'
+                                }`}
+                              >
+                                <FileIcon className="h-4 w-4 shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-xs font-medium">
+                                    {attachment.originalName}
+                                  </p>
+                                  <p className="text-[10px] opacity-80">
+                                    {formatBytes(attachment.size)}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
+                        <span
+                          className={`mt-1 block text-right text-xs ${
+                            isMe ? 'text-white/80' : 'text-text-muted'
+                          }`}
+                        >
+                          {formatTime(message.createdAt)}
+                          {message.editedAt && (
+                            <span className="ml-1 opacity-70">(edited)</span>
+                          )}
+                        </span>
                       </div>
                     )}
-                    <span
-                      className={`mt-1 block text-right text-xs ${
-                        isMe ? 'text-white/80' : 'text-text-muted'
-                      }`}
-                    >
-                      {formatTime(message.createdAt)}
-                    </span>
+                    {!isEditing && (
+                      <div
+                        className={`mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 ${
+                          isMe ? 'self-end' : 'self-start'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setReplyTo(message)}
+                          className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-text-muted hover:bg-gray-100 hover:text-text"
+                          title="Reply"
+                        >
+                          <CornerUpLeft className="h-3 w-3" />
+                          Reply
+                        </button>
+                        {isMe && message.content && (
+                          <button
+                            type="button"
+                            onClick={() => startEdit(message)}
+                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-text-muted hover:bg-gray-100 hover:text-text"
+                            title="Edit"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Edit
+                          </button>
+                        )}
+                        {isMe && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(message.id)}
+                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-red-600 hover:bg-red-50"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )
@@ -335,18 +527,20 @@ function ActiveThread({ conversationId, currentUserId }: ActiveThreadProps) {
 
       <Composer
         draft={draft}
-        onDraftChange={setDraft}
+        onDraftChange={(value) => {
+          setDraft(value)
+          if (value.trim()) {
+            sendTyping()
+          }
+        }}
         onSend={handleSend}
         isSending={isSending}
+        replyTo={replyTo}
+        onCancelReply={() => setReplyTo(null)}
+        typingUsers={typingUsers}
       />
     </div>
   )
-
-  function handleSend(content: string, attachments: File[]) {
-    if (!content.trim() && attachments.length === 0) return
-    sendMessage({ content, attachments })
-    setDraft('')
-  }
 }
 
 interface ComposerProps {
@@ -354,6 +548,9 @@ interface ComposerProps {
   onDraftChange: (value: string) => void
   onSend: (content: string, attachments: File[]) => void
   isSending: boolean
+  replyTo?: Message | null
+  onCancelReply?: () => void
+  typingUsers?: { id: number; name: string }[]
 }
 
 function Composer({
@@ -361,6 +558,9 @@ function Composer({
   onDraftChange,
   onSend,
   isSending,
+  replyTo,
+  onCancelReply,
+  typingUsers = [],
 }: ComposerProps) {
   const [files, setFiles] = useState<File[]>([])
 
@@ -392,12 +592,50 @@ function Composer({
   function handleSend() {
     onSend(draft, files)
     setFiles([])
+    onCancelReply?.()
   }
 
   const canSend = draft.trim() || files.length > 0
 
+  const typingLabel = (() => {
+    if (typingUsers.length === 0) return null
+    const names = typingUsers.map((u) => u.name.split(' ')[0])
+    if (names.length === 1) return `${names[0]} is typing...`
+    if (names.length === 2) return `${names.join(' and ')} are typing...`
+    return `${names.slice(0, 2).join(', ')} and ${names.length - 2} others are typing...`
+  })()
+
   return (
     <div className="border-t border-gray-200 bg-white p-4">
+      {typingLabel && (
+        <div className="mb-2 flex items-center gap-2 text-xs text-text-muted">
+          <span className="flex gap-0.5">
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-muted/60" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-muted/60 [animation-delay:120ms]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-muted/60 [animation-delay:240ms]" />
+          </span>
+          {typingLabel}
+        </div>
+      )}
+      {replyTo && (
+        <div className="mb-2 flex items-start justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-text">
+              Replying to {replyTo.sender?.name ?? 'Unknown'}
+            </p>
+            <p className="truncate text-xs text-text-muted">
+              {replyTo.content ?? 'Attachment'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelReply}
+            className="shrink-0 rounded-full p-1 text-text-muted hover:bg-gray-200 hover:text-text"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
       {files.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
           {files.map((file, index) => (
