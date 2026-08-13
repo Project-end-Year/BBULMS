@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   GraduationCap,
   LayoutDashboard,
@@ -41,7 +41,6 @@ function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
-  const location = useLocation()
   const navigate = useNavigate()
   const notifRef = useRef<HTMLDivElement>(null)
   const { user } = useAuth()
@@ -81,7 +80,6 @@ function AppLayout() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [notifOpen])
 
-  const activeLabel = navItems.find((item) => location.pathname.startsWith(item.to))?.label ?? 'BBU LMS'
 
   const sidebarClasses = sidebarOpen ? 'w-64' : 'w-18'
 
@@ -322,7 +320,6 @@ function AppLayout() {
         {/* Content area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           <div className="mb-4">
-            <h1 className="text-xl font-semibold text-text sm:text-2xl">{activeLabel}</h1>
           </div>
           <Outlet />
         </main>
