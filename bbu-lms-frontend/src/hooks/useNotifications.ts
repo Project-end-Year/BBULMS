@@ -1,10 +1,23 @@
+import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/axios'
+import { useAuth } from '@/contexts/AuthContext'
+import { useEcho } from '@/contexts/EchoContext'
+
+export type NotificationType =
+  | 'announcement'
+  | 'chat_message'
+  | 'exam_reminder'
+  | 'new_assignment'
+  | 'deadline'
+  | 'new_grade'
+  | 'attendance_reminder'
+  | 'event'
 
 export interface Notification {
   id: number
-  type: 'announcement' | 'message' | 'event'
+  type: NotificationType
   title: string
   body: string | null
   data: Record<string, unknown> | null
@@ -56,12 +69,44 @@ export function useMarkAllNotificationsRead() {
   })
 }
 
-const TYPE_LABELS: Record<Notification['type'], string> = {
+const TYPE_LABELS: Record<NotificationType, string> = {
   announcement: 'Announcement',
-  message: 'Message',
+  chat_message: 'Message',
+  exam_reminder: 'Exam',
+  new_assignment: 'Assignment',
+  deadline: 'Deadline',
+  new_grade: 'Grade',
+  attendance_reminder: 'Attendance',
   event: 'Event',
 }
 
-export function notificationTypeLabel(type: Notification['type']): string {
+export function notificationTypeLabel(type: NotificationType): string {
   return TYPE_LABELS[type] ?? type
+}
+
+/**
+ * Listen for real-time notification broadcasts on the user's private channel
+ * and refresh the notification feed.
+ */
+export function useListenNotifications(enabled = true) {
+  const { user } = useAuth()
+  const { echo, connected } = useEcho()
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    if (!enabled || !echo || !connected || !user) {
+      return
+    }
+
+    const channel = echo.private(`App.Models.User.${user.id}`)
+    const handler = () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    }
+
+    channel.listen('.notification.created', handler)
+
+    return () => {
+      channel.stopListening('.notification.created')
+    }
+  }, [echo, connected, enabled, queryClient, user])
 }

@@ -22,6 +22,7 @@ import {
   useNotifications,
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
+  useListenNotifications,
   notificationTypeLabel,
 } from '@/hooks/useNotifications'
 
@@ -46,6 +47,8 @@ function AppLayout() {
     useNotifications()
   const { mutate: markRead } = useMarkNotificationRead()
   const { mutate: markAllRead } = useMarkAllNotificationsRead()
+
+  useListenNotifications()
 
   const unreadCount = notificationsData?.unreadCount ?? 0
   const notifications = notificationsData?.notifications ?? []

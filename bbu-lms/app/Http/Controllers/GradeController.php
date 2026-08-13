@@ -10,6 +10,7 @@ use App\Models\Grade;
 use App\Models\GradeComponent;
 use App\Models\User;
 use App\Services\GradeCalculator;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -147,8 +148,12 @@ class GradeController extends Controller
             ]
         );
 
+        $grade->load(['student', 'component']);
+
+        NotificationService::fromGrade($grade, $offering);
+
         return ApiResponse::success(
-            ['grade' => new GradeResource($grade->load(['student', 'component']))],
+            ['grade' => new GradeResource($grade)],
             'Grade saved.'
         );
     }

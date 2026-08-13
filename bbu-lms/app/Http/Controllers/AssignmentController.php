@@ -7,6 +7,7 @@ use App\Http\Resources\AssignmentResource;
 use App\Models\Assignment;
 use App\Models\CourseOffering;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -78,6 +79,10 @@ class AssignmentController extends Controller
 
         $assignment->load(['courseOffering', 'creator']);
 
+        if ($assignment->is_published) {
+            NotificationService::fromAssignment($assignment, $offering);
+        }
+
         return ApiResponse::success(
             ['assignment' => new AssignmentResource($assignment)],
             'Assignment created.',
@@ -134,6 +139,10 @@ class AssignmentController extends Controller
         ]);
 
         $assignment->load(['courseOffering', 'creator']);
+
+        if ($assignment->is_published && ($assignment->wasChanged('due_at') || $assignment->wasChanged('is_published'))) {
+            NotificationService::fromAssignmentDeadline($assignment, $offering);
+        }
 
         return ApiResponse::success(
             ['assignment' => new AssignmentResource($assignment)],

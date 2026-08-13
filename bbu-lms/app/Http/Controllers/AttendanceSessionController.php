@@ -9,6 +9,7 @@ use App\Models\AttendanceSession;
 use App\Models\CourseOffering;
 use App\Models\Enrollment;
 use App\Models\User;
+use App\Services\NotificationService;
 use chillerlan\QRCode\Common\EccLevel;
 use chillerlan\QRCode\Data\QRCodeData;
 use chillerlan\QRCode\Output\QRMarkupSVG;
@@ -91,6 +92,10 @@ class AttendanceSessionController extends Controller
 
         $session->load(['lecturer', 'records.student']);
         $session->loadCount('records');
+
+        if ($session->is_active) {
+            NotificationService::fromAttendanceSession($session, $offering);
+        }
 
         return ApiResponse::success(
             ['session' => new AttendanceSessionResource($session)],

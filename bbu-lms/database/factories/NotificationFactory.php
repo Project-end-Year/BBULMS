@@ -17,7 +17,7 @@ class NotificationFactory extends Factory
     {
         return [
             'user_id' => User::factory(),
-            'type' => $this->faker->randomElement(['announcement', 'message', 'event']),
+            'type' => $this->faker->randomElement(Notification::types()),
             'title' => $this->faker->sentence(5),
             'body' => $this->faker->optional()->paragraph(),
             'data' => null,
