@@ -9,11 +9,19 @@ import {
   AlertCircle,
   Clock,
   ChevronRight,
+  GraduationCap,
+  MapPin,
+  CheckCircle2,
+  Circle,
+  FileText,
+  Bell,
 } from 'lucide-react'
+import { format, formatDistanceToNow, isToday, isTomorrow, parseISO } from 'date-fns'
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useMyCourses } from '@/hooks/useMyCourses'
 import { useGradeSummary } from '@/hooks/useGradeHistory'
+import { useStudentDashboard, type DashboardAssignment, type DashboardClass, type DashboardExam, type DashboardGrade } from '@/hooks/useStudentDashboard'
 
 function letterGradeColorClass(letter: string | null | undefined): string {
   if (!letter) return 'bg-gray-100 text-text-muted'
@@ -38,12 +46,21 @@ function StatCard({
   value,
   icon: Icon,
   to,
+  tone = 'blue',
 }: {
   label: string
   value: string | number
   icon: React.ElementType
   to?: string
+  tone?: 'blue' | 'green' | 'amber' | 'red'
 }) {
+  const toneClasses = {
+    blue: 'bg-bbu-blue/10 text-bbu-blue',
+    green: 'bg-green-100 text-green-700',
+    amber: 'bg-amber-100 text-amber-700',
+    red: 'bg-red-100 text-red-700',
+  }
+
   const content = (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-center justify-between">
@@ -51,8 +68,8 @@ function StatCard({
           <p className="text-sm font-medium text-text-muted">{label}</p>
           <p className="mt-2 text-2xl font-semibold text-text">{value}</p>
         </div>
-        <div className="rounded-lg bg-gray-50 p-2">
-          <Icon className="h-5 w-5 text-bbu-blue" />
+        <div className={`rounded-lg p-2 ${toneClasses[tone]}`}>
+          <Icon className="h-5 w-5" />
         </div>
       </div>
     </div>
@@ -69,6 +86,38 @@ function StatCard({
   return content
 }
 
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
+      <p className="text-sm text-text-muted">{message}</p>
+    </div>
+  )
+}
+
+function SectionHeader({ icon: Icon, title, to }: { icon: React.ElementType; title: string; to?: string }) {
+  return (
+    <div className="mb-3 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <Icon className="h-5 w-5 text-bbu-blue" />
+        <h3 className="text-base font-semibold text-text">{title}</h3>
+      </div>
+      {to && (
+        <Link to={to} className="inline-flex items-center gap-1 text-sm font-medium text-bbu-blue hover:underline">
+          View all
+          <ChevronRight className="h-4 w-4" />
+        </Link>
+      )}
+    </div>
+  )
+}
+
+function formatDueLabel(dueAt: string): string {
+  const date = parseISO(dueAt)
+  if (isToday(date)) return 'Due today'
+  if (isTomorrow(date)) return 'Due tomorrow'
+  return `Due ${formatDistanceToNow(date, { addSuffix: true })}`
+}
+
 function GradeSummaryCard() {
   const { data, isLoading } = useGradeSummary()
 
@@ -76,9 +125,7 @@ function GradeSummaryCard() {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p className="text-sm font-medium text-text-muted">Grade Summary</p>
-        <div className="mt-4 flex items-center justify-center py-8 text-text-muted">
-          Loading...
-        </div>
+        <div className="mt-4 flex items-center justify-center py-8 text-text-muted">Loading...</div>
       </div>
     )
   }
@@ -97,19 +144,14 @@ function GradeSummaryCard() {
           <TrendingUp className="h-5 w-5 text-bbu-blue" />
           <h3 className="text-base font-semibold text-text">{semesterName}</h3>
         </div>
-        <Link
-          to="/courses"
-          className="inline-flex items-center gap-1 text-sm font-medium text-bbu-blue hover:underline"
-        >
+        <Link to="/courses" className="inline-flex items-center gap-1 text-sm font-medium text-bbu-blue hover:underline">
           Grades
           <ChevronRight className="h-4 w-4" />
         </Link>
       </div>
 
       {courses.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
-          <p className="text-sm text-text-muted">No graded courses this semester yet.</p>
-        </div>
+        <EmptyState message="No graded courses this semester yet." />
       ) : (
         <div className="space-y-3">
           {courses.slice(0, 5).map((course) => (
@@ -152,16 +194,158 @@ function GradeSummaryCard() {
   )
 }
 
-function UpcomingDeadlines() {
+function TodaysClasses({ classes }: { classes: DashboardClass[] }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <SectionHeader icon={GraduationCap} title="Today's Classes" to="/courses" />
+      {classes.length === 0 ? (
+        <EmptyState message="No classes scheduled for today." />
+      ) : (
+        <div className="space-y-3">
+          {classes.map((session) => (
+            <div key={session.id} className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-text">
+                  {session.courseCode} · {session.courseName}
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    {session.startTime?.slice(0, 5)} – {session.endTime?.slice(0, 5)}
+                  </span>
+                  {session.room && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {session.room}
+                    </span>
+                  )}
+                  {session.type && <span className="capitalize">{session.type}</span>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function UpcomingAssignments({ assignments }: { assignments: DashboardAssignment[] }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <SectionHeader icon={ClipboardList} title="Upcoming Assignments" to="/courses" />
+      {assignments.length === 0 ? (
+        <EmptyState message="No upcoming assignments in the next two weeks." />
+      ) : (
+        <div className="space-y-3">
+          {assignments.slice(0, 5).map((assignment) => (
+            <Link
+              key={assignment.id}
+              to={`/courses/${assignment.offeringId}?tab=assignments`}
+              className="flex items-start justify-between rounded-lg border border-gray-100 bg-gray-50/50 p-3 transition-colors hover:bg-gray-100"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-text">{assignment.title}</p>
+                <p className="text-xs text-text-muted">
+                  {assignment.courseCode} · {assignment.courseName}
+                </p>
+                <p className="mt-1 text-xs font-medium text-amber-600">{formatDueLabel(assignment.dueAt)}</p>
+              </div>
+              <div className="ml-3 shrink-0">
+                {assignment.isSubmitted ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                ) : (
+                  <Circle className="h-5 w-5 text-gray-300" />
+                )}
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AttendanceCard({ percentage }: { percentage: number | null }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center gap-2">
-        <Clock className="h-5 w-5 text-bbu-blue" />
-        <h3 className="text-base font-semibold text-text">Upcoming</h3>
+        <Bell className="h-5 w-5 text-bbu-blue" />
+        <h3 className="text-base font-semibold text-text">Attendance</h3>
       </div>
-      <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
-        <p className="text-sm text-text-muted">No upcoming deadlines displayed here yet.</p>
-      </div>
+      {percentage === null ? (
+        <EmptyState message="No attendance sessions recorded yet." />
+      ) : (
+        <div className="flex items-center gap-4">
+          <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-bbu-blue/20">
+            <span className="text-lg font-bold text-bbu-blue">{percentage}%</span>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-text">Overall attendance rate</p>
+            <p className="text-xs text-text-muted">Across all enrolled courses</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RecentGrades({ grades }: { grades: DashboardGrade[] }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <SectionHeader icon={FileText} title="Recent Grades" to="/courses" />
+      {grades.length === 0 ? (
+        <EmptyState message="No grades posted yet." />
+      ) : (
+        <div className="space-y-3">
+          {grades.map((grade) => (
+            <div key={grade.id} className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-text">{grade.componentName}</p>
+                <p className="text-xs text-text-muted">
+                  {grade.courseCode} · {grade.courseName}
+                </p>
+                <p className="text-xs text-text-muted">{format(parseISO(grade.updatedAt), 'MMM d, yyyy')}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                {grade.percentage !== null && (
+                  <span className="text-sm font-medium text-text">{grade.percentage.toFixed(2)}%</span>
+                )}
+                {grade.letterGrade && (
+                  <span className={`rounded px-2 py-0.5 text-xs font-bold ${letterGradeColorClass(grade.letterGrade)}`}>
+                    {grade.letterGrade}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function UpcomingExams({ exams }: { exams: DashboardExam[] }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <SectionHeader icon={CalendarDays} title="Upcoming Exams" to="/calendar" />
+      {exams.length === 0 ? (
+        <EmptyState message="No exams scheduled in the next 30 days." />
+      ) : (
+        <div className="space-y-3">
+          {exams.slice(0, 5).map((exam) => (
+            <div key={exam.id} className="rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+              <p className="text-sm font-medium text-text">{exam.title}</p>
+              <p className="text-xs text-text-muted">
+                {exam.courseCode} · {exam.courseName}
+              </p>
+              <p className="mt-1 text-xs font-medium text-red-600">
+                {format(parseISO(exam.startsAt), 'MMM d, yyyy h:mm a')}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -169,11 +353,16 @@ function UpcomingDeadlines() {
 function DashboardPage() {
   const { user } = useAuth()
   const { offerings, isLoading: coursesLoading } = useMyCourses()
+  const { data: dashboard, isLoading: dashboardLoading } = useStudentDashboard()
 
   const isStudent = user?.roles?.some((r) => r.name === 'student')
   const courseCount = offerings?.length ?? 0
 
   const welcomeName = user?.name?.split(' ')[0] ?? 'there'
+
+  const unreadMessages = dashboard?.unreadMessages ?? 0
+  const upcomingAssignments = dashboard?.upcomingAssignments ?? []
+  const upcomingExams = dashboard?.upcomingExams ?? []
 
   return (
     <div className="space-y-6">
@@ -186,19 +375,49 @@ function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Courses" value={coursesLoading ? '-' : courseCount} icon={BookOpen} to="/courses" />
-        <StatCard label="Assignments" value="0" icon={ClipboardList} />
-        <StatCard label="Calendar Events" value="0" icon={CalendarDays} to="/calendar" />
-        <StatCard label="Messages" value="0" icon={MessageSquare} to="/chat" />
+        <StatCard
+          label="Courses"
+          value={coursesLoading ? '-' : courseCount}
+          icon={BookOpen}
+          to="/courses"
+          tone="blue"
+        />
+        <StatCard
+          label="Assignments"
+          value={dashboardLoading ? '-' : upcomingAssignments.length}
+          icon={ClipboardList}
+          to="/courses"
+          tone="amber"
+        />
+        <StatCard
+          label="Upcoming Exams"
+          value={dashboardLoading ? '-' : upcomingExams.length}
+          icon={CalendarDays}
+          to="/calendar"
+          tone="red"
+        />
+        <StatCard
+          label="Unread Messages"
+          value={dashboardLoading ? '-' : unreadMessages}
+          icon={MessageSquare}
+          to="/chat"
+          tone={unreadMessages > 0 ? 'red' : 'green'}
+        />
       </div>
 
       {isStudent && (
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+          <div className="space-y-6 lg:col-span-2">
             <GradeSummaryCard />
+            <div className="grid gap-6 sm:grid-cols-2">
+              <TodaysClasses classes={dashboard?.todaysClasses ?? []} />
+              <AttendanceCard percentage={dashboard?.attendancePercentage ?? null} />
+            </div>
+            <RecentGrades grades={dashboard?.recentGrades ?? []} />
           </div>
-          <div>
-            <UpcomingDeadlines />
+          <div className="space-y-6">
+            <UpcomingAssignments assignments={upcomingAssignments} />
+            <UpcomingExams exams={upcomingExams} />
           </div>
         </div>
       )}

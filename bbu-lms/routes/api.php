@@ -18,6 +18,7 @@ use App\Http\Controllers\QuizController;
 use App\Http\Controllers\ClassScheduleController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\CourseController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CourseOfferingController;
 use App\Http\Controllers\CourseMaterialController;
 use App\Http\Controllers\EnrollmentController;
@@ -54,6 +55,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/profile/avatar', [ProfileController::class, 'uploadAvatar']);
 
     Route::get('/my-courses', [CourseOfferingController::class, 'myCourses']);
+    Route::get('/dashboard/student', [DashboardController::class, 'student']);
+    Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
     Route::get('/announcements', [AnnouncementController::class, 'feed']);
 
     Route::get('/calendar', [CalendarEventController::class, 'feed']);
