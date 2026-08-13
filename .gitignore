@@ -26,6 +26,7 @@ bbu-lms-frontend/.env.*.local
 bbu-lms-frontend/*.log
 
 .claude/
+Build University LMS Architecture/
 
 # IDE / OS
 .idea/
