@@ -17,8 +17,14 @@ use App\Http\Controllers\QuizAttemptController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\ClassScheduleController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\AdminReportController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\CourseController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\FacultyController;
+use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\SemesterController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CourseOfferingController;
 use App\Http\Controllers\CourseMaterialController;
@@ -182,5 +188,31 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/course-offerings', [CourseOfferingController::class, 'store']);
         Route::put('/course-offerings/{offering}', [CourseOfferingController::class, 'update']);
         Route::delete('/course-offerings/{offering}', [CourseOfferingController::class, 'destroy']);
+
+        Route::get('/dashboard', [AdminDashboardController::class, 'index']);
+
+        Route::get('/faculties', [FacultyController::class, 'index']);
+
+        Route::get('/departments', [DepartmentController::class, 'index']);
+        Route::post('/departments', [DepartmentController::class, 'store']);
+        Route::get('/departments/{department}', [DepartmentController::class, 'show']);
+        Route::put('/departments/{department}', [DepartmentController::class, 'update']);
+        Route::delete('/departments/{department}', [DepartmentController::class, 'destroy']);
+
+        Route::get('/programs', [ProgramController::class, 'index']);
+        Route::post('/programs', [ProgramController::class, 'store']);
+        Route::get('/programs/{program}', [ProgramController::class, 'show']);
+        Route::put('/programs/{program}', [ProgramController::class, 'update']);
+        Route::delete('/programs/{program}', [ProgramController::class, 'destroy']);
+
+        Route::get('/semesters', [SemesterController::class, 'index']);
+        Route::post('/semesters', [SemesterController::class, 'store']);
+        Route::get('/semesters/{semester}', [SemesterController::class, 'show']);
+        Route::put('/semesters/{semester}', [SemesterController::class, 'update']);
+        Route::delete('/semesters/{semester}', [SemesterController::class, 'destroy']);
+
+        Route::get('/reports/users', [AdminReportController::class, 'users']);
+        Route::get('/reports/courses', [AdminReportController::class, 'courses']);
+        Route::get('/reports/enrollments', [AdminReportController::class, 'enrollments']);
     });
 });

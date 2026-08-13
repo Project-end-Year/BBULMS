@@ -3,7 +3,9 @@ import { NavLink, Outlet } from 'react-router-dom'
 
 function AdminPage() {
   const tabs = [
+    { to: '/admin/dashboard', label: 'Dashboard' },
     { to: '/admin/users', label: 'Users' },
+    { to: '/admin/courses', label: 'Courses' },
     { to: '/admin/departments', label: 'Departments' },
     { to: '/admin/programs', label: 'Programs' },
     { to: '/admin/semesters', label: 'Semesters' },

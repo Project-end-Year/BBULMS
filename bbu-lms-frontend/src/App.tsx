@@ -19,7 +19,9 @@ import AnnouncementsPage from '@/pages/AnnouncementsPage'
 import StudentAnalyticsPage from '@/pages/StudentAnalyticsPage'
 import ProfilePage from '@/pages/ProfilePage'
 import AdminPage from '@/pages/AdminPage'
+import AdminDashboardPage from '@/pages/admin/AdminDashboardPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
+import AdminCoursesPage from '@/pages/admin/AdminCoursesPage'
 import AdminDepartmentsPage from '@/pages/admin/AdminDepartmentsPage'
 import AdminProgramsPage from '@/pages/admin/AdminProgramsPage'
 import AdminSemestersPage from '@/pages/admin/AdminSemestersPage'
@@ -49,8 +51,10 @@ function App() {
 
                 <Route element={<RequireRole role="admin" />}>
                   <Route path="/admin" element={<AdminPage />}>
-                    <Route index element={<Navigate to="/admin/users" replace />} />
+                    <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                    <Route path="dashboard" element={<AdminDashboardPage />} />
                     <Route path="users" element={<AdminUsersPage />} />
+                    <Route path="courses" element={<AdminCoursesPage />} />
                     <Route path="departments" element={<AdminDepartmentsPage />} />
                     <Route path="programs" element={<AdminProgramsPage />} />
                     <Route path="semesters" element={<AdminSemestersPage />} />

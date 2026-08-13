@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,81 +7,70 @@ import {
   Search,
   Loader2,
   Pencil,
-  Trash2,
+  Power,
+  PowerOff,
   X,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
 
-import { useAdminPrograms, type Program, type ProgramFormData } from '@/hooks/useAdminPrograms'
-import { useAdminDepartments } from '@/hooks/useAdminDepartments'
+import { useCourses, type Course, type CourseFormData } from '@/hooks/useCourses'
 
-const programSchema = z.object({
-  departmentId: z.number().min(1, 'Department is required'),
+const courseSchema = z.object({
   code: z.string().min(1, 'Code is required').max(20, 'Too long'),
   name: z.string().min(1, 'Name is required').max(255, 'Too long'),
   description: z.string().optional(),
-  durationYears: z.number().min(1).max(10).optional(),
+  credits: z.number().min(0).max(20, 'Invalid credits'),
+  departmentId: z.number().optional(),
+  programId: z.number().optional(),
   isActive: z.boolean(),
 })
 
-type FormValues = z.infer<typeof programSchema>
+type FormValues = z.infer<typeof courseSchema>
 
-function formatDate(value: string | null | undefined) {
-  if (!value) return '-'
-  return new Date(value).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
-
-function ProgramModal({
-  program,
+function CourseModal({
+  course,
   onClose,
   onSave,
   isSaving,
-  departments,
+  meta,
 }: {
-  program?: Program | null
+  course?: Course | null
   onClose: () => void
-  onSave: (data: ProgramFormData) => Promise<void>
+  onSave: (data: CourseFormData) => Promise<void>
   isSaving: boolean
-  departments: { id: number; name: string }[]
+  meta: {
+    departments: { id: number; name: string }[]
+    programs: { id: number; name: string; departmentId?: number }[]
+  } | undefined
 }) {
   const {
     register,
     handleSubmit,
-    reset,
+    watch,
     formState: { errors },
   } = useForm<FormValues>({
-    resolver: zodResolver(programSchema),
+    resolver: zodResolver(courseSchema),
     defaultValues: {
-      departmentId: program?.departmentId,
-      code: program?.code ?? '',
-      name: program?.name ?? '',
-      description: program?.description ?? '',
-      durationYears: program?.durationYears ?? 4,
-      isActive: program?.isActive ?? true,
+      code: course?.code ?? '',
+      name: course?.name ?? '',
+      description: course?.description ?? '',
+      credits: course?.credits ?? 3,
+      departmentId: course?.department?.id,
+      programId: course?.program?.id,
+      isActive: course?.isActive ?? true,
     },
   })
 
-  useEffect(() => {
-    reset({
-      departmentId: program?.departmentId,
-      code: program?.code ?? '',
-      name: program?.name ?? '',
-      description: program?.description ?? '',
-      durationYears: program?.durationYears ?? 4,
-      isActive: program?.isActive ?? true,
-    })
-  }, [program, reset])
+  const selectedDepartmentId = watch('departmentId')
+  const availablePrograms =
+    meta?.programs?.filter((p) => !selectedDepartmentId || p.departmentId === selectedDepartmentId) ?? []
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-text">{program ? 'Edit Program' : 'Create Program'}</h3>
+          <h3 className="text-lg font-semibold text-text">{course ? 'Edit Course' : 'Create Course'}</h3>
           <button type="button" onClick={onClose} className="rounded p-1 text-text-muted hover:bg-gray-100">
             <X className="h-5 w-5" />
           </button>
@@ -90,64 +79,44 @@ function ProgramModal({
         <form
           onSubmit={handleSubmit((values) =>
             onSave({
-              departmentId: values.departmentId,
               code: values.code,
               name: values.name,
               description: values.description,
-              durationYears: values.durationYears,
+              credits: values.credits,
+              departmentId: values.departmentId,
+              programId: values.programId,
               isActive: values.isActive,
             })
           )}
           className="space-y-4"
         >
-          <div>
-            <label className="mb-1 block text-sm font-medium text-text">Department</label>
-            <select
-              {...register('departmentId', { valueAsNumber: true })}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-text focus:border-bbu-blue focus:outline-none"
-            >
-              <option value="">Select department...</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-            {errors.departmentId && <p className="mt-1 text-xs text-red-600">{errors.departmentId.message}</p>}
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-text">Code</label>
               <input
                 {...register('code')}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-text focus:border-bbu-blue focus:outline-none"
-                placeholder="SE"
               />
               {errors.code && <p className="mt-1 text-xs text-red-600">{errors.code.message}</p>}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-text">Name</label>
+              <label className="mb-1 block text-sm font-medium text-text">Credits</label>
               <input
-                {...register('name')}
+                type="number"
+                {...register('credits', { valueAsNumber: true })}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-text focus:border-bbu-blue focus:outline-none"
-                placeholder="Software Engineering"
               />
-              {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
+              {errors.credits && <p className="mt-1 text-xs text-red-600">{errors.credits.message}</p>}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text">Duration (years)</label>
-              <input
-                type="number"
-                {...register('durationYears', { valueAsNumber: true })}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-text focus:border-bbu-blue focus:outline-none"
-              />
-            </div>
-            <div className="flex items-center gap-2 pt-6">
-              <input type="checkbox" id="isActive" {...register('isActive')} className="h-4 w-4 rounded border-gray-300 text-bbu-blue" />
-              <label htmlFor="isActive" className="text-sm text-text">Active</label>
-            </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text">Name</label>
+            <input
+              {...register('name')}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-text focus:border-bbu-blue focus:outline-none"
+            />
+            {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
           </div>
 
           <div>
@@ -157,6 +126,38 @@ function ProgramModal({
               rows={3}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-text focus:border-bbu-blue focus:outline-none"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text">Department</label>
+              <select
+                {...register('departmentId', { valueAsNumber: true })}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-text focus:border-bbu-blue focus:outline-none"
+              >
+                <option value="">None</option>
+                {meta?.departments?.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text">Program</label>
+              <select
+                {...register('programId', { valueAsNumber: true })}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-text focus:border-bbu-blue focus:outline-none"
+              >
+                <option value="">None</option>
+                {availablePrograms.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="courseIsActive" {...register('isActive')} className="h-4 w-4 rounded border-gray-300 text-bbu-blue" />
+            <label htmlFor="courseIsActive" className="text-sm text-text">Active</label>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
@@ -173,7 +174,7 @@ function ProgramModal({
               className="inline-flex items-center gap-2 rounded-lg bg-bbu-blue px-4 py-2 text-sm font-medium text-white hover:bg-bbu-blue/90 disabled:opacity-60"
             >
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {program ? 'Update' : 'Create'}
+              {course ? 'Update' : 'Create'}
             </button>
           </div>
         </form>
@@ -182,27 +183,35 @@ function ProgramModal({
   )
 }
 
-function AdminProgramsPage() {
+function formatDate(value: string | null | undefined) {
+  if (!value) return '-'
+  return new Date(value).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+function AdminCoursesPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState<Program | null>(null)
-  const [deleting, setDeleting] = useState<Program | null>(null)
+  const [editing, setEditing] = useState<Course | null>(null)
 
-  const { departments } = useAdminDepartments({ perPage: 100 })
   const {
-    programs,
+    courses,
     pagination,
     isLoading,
+    meta,
     create,
     isCreating,
     update,
     isUpdating,
-    remove,
-    isDeleting,
-  } = useAdminPrograms({ search, page, perPage: 10 })
+    toggleActive,
+    isTogglingActive,
+  } = useCourses({ search, page, perPage: 10 })
 
-  async function handleSave(formData: ProgramFormData) {
+  async function handleSave(formData: CourseFormData) {
     if (editing) {
       await update({ id: editing.id, formData })
     } else {
@@ -211,14 +220,6 @@ function AdminProgramsPage() {
     setModalOpen(false)
     setEditing(null)
   }
-
-  async function handleDelete() {
-    if (!deleting) return
-    await remove(deleting.id)
-    setDeleting(null)
-  }
-
-  const departmentById = new Map((departments ?? []).map((d) => [d.id, d]))
 
   return (
     <div className="space-y-4">
@@ -232,7 +233,7 @@ function AdminProgramsPage() {
               setSearch(e.target.value)
               setPage(1)
             }}
-            placeholder="Search programs..."
+            placeholder="Search courses..."
             className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm text-text focus:border-bbu-blue focus:outline-none"
           />
         </div>
@@ -245,7 +246,7 @@ function AdminProgramsPage() {
           className="inline-flex items-center gap-2 rounded-lg bg-bbu-blue px-4 py-2 text-sm font-medium text-white hover:bg-bbu-blue/90"
         >
           <Plus className="h-4 w-4" />
-          Add Program
+          Add Course
         </button>
       </div>
 
@@ -256,7 +257,7 @@ function AdminProgramsPage() {
               <th className="px-4 py-3 font-medium">Code</th>
               <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Department</th>
-              <th className="px-4 py-3 font-medium">Duration</th>
+              <th className="px-4 py-3 font-medium">Credits</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Created</th>
               <th className="px-4 py-3 text-right font-medium">Actions</th>
@@ -269,35 +270,35 @@ function AdminProgramsPage() {
                   <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                 </td>
               </tr>
-            ) : programs?.length === 0 ? (
+            ) : courses?.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-text-muted">
-                  No programs found.
+                  No courses found.
                 </td>
               </tr>
             ) : (
-              programs?.map((p) => (
-                <tr key={p.id}>
-                  <td className="px-4 py-3 font-medium text-text">{p.code}</td>
-                  <td className="px-4 py-3 text-text">{p.name}</td>
-                  <td className="px-4 py-3 text-text-muted">{departmentById.get(p.departmentId)?.name ?? '-'}</td>
-                  <td className="px-4 py-3 text-text-muted">{p.durationYears} year{p.durationYears === 1 ? '' : 's'}</td>
+              courses?.map((course) => (
+                <tr key={course.id}>
+                  <td className="px-4 py-3 font-medium text-text">{course.code}</td>
+                  <td className="px-4 py-3 text-text">{course.name}</td>
+                  <td className="px-4 py-3 text-text-muted">{course.department?.name ?? '-'}</td>
+                  <td className="px-4 py-3 text-text-muted">{course.credits}</td>
                   <td className="px-4 py-3">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        p.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        course.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                       }`}
                     >
-                      {p.isActive ? 'Active' : 'Inactive'}
+                      {course.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-text-muted">{formatDate(p.createdAt)}</td>
+                  <td className="px-4 py-3 text-text-muted">{formatDate(course.createdAt)}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button
                         type="button"
                         onClick={() => {
-                          setEditing(p)
+                          setEditing(course)
                           setModalOpen(true)
                         }}
                         className="rounded p-1 text-text-muted hover:bg-gray-100"
@@ -307,11 +308,12 @@ function AdminProgramsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setDeleting(p)}
-                        className="rounded p-1 text-red-600 hover:bg-red-50"
-                        aria-label="Delete"
+                        onClick={() => toggleActive(course.id)}
+                        disabled={isTogglingActive}
+                        className={`rounded p-1 ${course.isActive ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
+                        aria-label={course.isActive ? 'Deactivate' : 'Activate'}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {course.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                       </button>
                     </div>
                   </td>
@@ -336,9 +338,7 @@ function AdminProgramsPage() {
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="text-text-muted">
-              {page} / {pagination.lastPage}
-            </span>
+            <span className="text-text-muted">{page} / {pagination.lastPage}</span>
             <button
               type="button"
               disabled={page >= pagination.lastPage}
@@ -351,49 +351,20 @@ function AdminProgramsPage() {
         </div>
       )}
 
-      {modalOpen && (
-        <ProgramModal
-          program={editing}
+      {modalOpen && meta && (
+        <CourseModal
+          course={editing}
           onClose={() => {
             setModalOpen(false)
             setEditing(null)
           }}
           onSave={handleSave}
           isSaving={isCreating || isUpdating}
-          departments={departments ?? []}
+          meta={meta}
         />
-      )}
-
-      {deleting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
-            <h3 className="text-lg font-semibold text-text">Delete Program?</h3>
-            <p className="mt-2 text-sm text-text-muted">
-              This will permanently remove {deleting.name} ({deleting.code}).
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setDeleting(null)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-text hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
-              >
-                {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )
 }
 
-export default AdminProgramsPage
+export default AdminCoursesPage

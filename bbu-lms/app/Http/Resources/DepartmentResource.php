@@ -20,6 +20,14 @@ class DepartmentResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'isActive' => $this->is_active,
+            'facultyId' => $this->faculty_id,
+            'faculty' => $this->whenLoaded('faculty', function () {
+                return $this->faculty ? [
+                    'id' => $this->faculty->id,
+                    'code' => $this->faculty->code,
+                    'name' => $this->faculty->name,
+                ] : null;
+            }),
             'programs' => ProgramResource::collection($this->whenLoaded('programs')),
             'createdAt' => $this->created_at,
             'updatedAt' => $this->updated_at,

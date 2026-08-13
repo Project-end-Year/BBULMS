@@ -1,8 +1,385 @@
-function AdminDepartmentsPage() {
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import {
+  Plus,
+  Search,
+  Loader2,
+  Pencil,
+  Trash2,
+  X,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
+
+import { useAdminDepartments, type Department, type DepartmentFormData } from '@/hooks/useAdminDepartments'
+import { useAdminFaculties } from '@/hooks/useAdminFaculties'
+
+const departmentSchema = z.object({
+  facultyId: z.number().min(1, 'Faculty is required'),
+  code: z.string().min(1, 'Code is required').max(20, 'Too long'),
+  name: z.string().min(1, 'Name is required').max(255, 'Too long'),
+  description: z.string().optional(),
+  isActive: z.boolean(),
+})
+
+type FormValues = z.infer<typeof departmentSchema>
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return '-'
+  return new Date(value).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+function DepartmentModal({
+  department,
+  onClose,
+  onSave,
+  isSaving,
+  faculties,
+}: {
+  department?: Department | null
+  onClose: () => void
+  onSave: (data: DepartmentFormData) => Promise<void>
+  isSaving: boolean
+  faculties: { id: number; name: string }[]
+}) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(departmentSchema),
+    defaultValues: {
+      facultyId: department?.facultyId,
+      code: department?.code ?? '',
+      name: department?.name ?? '',
+      description: department?.description ?? '',
+      isActive: department?.isActive ?? true,
+    },
+  })
+
+  useEffect(() => {
+    reset({
+      facultyId: department?.facultyId,
+      code: department?.code ?? '',
+      name: department?.name ?? '',
+      description: department?.description ?? '',
+      isActive: department?.isActive ?? true,
+    })
+  }, [department, reset])
+
   return (
-    <div>
-      <h2 className="mb-4 text-lg font-semibold text-text">Manage Departments</h2>
-      <p className="text-text-muted">Department CRUD will be added in the admin module.</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-text">{department ? 'Edit Department' : 'Create Department'}</h3>
+          <button type="button" onClick={onClose} className="rounded p-1 text-text-muted hover:bg-gray-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form
+          onSubmit={handleSubmit((values) =>
+            onSave({
+              facultyId: values.facultyId,
+              code: values.code,
+              name: values.name,
+              description: values.description,
+              isActive: values.isActive,
+            })
+          )}
+          className="space-y-4"
+        >
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text">Faculty</label>
+            <select
+              {...register('facultyId', { valueAsNumber: true })}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-text focus:border-bbu-blue focus:outline-none"
+            >
+              <option value="">Select faculty...</option>
+              {faculties.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+            {errors.facultyId && <p className="mt-1 text-xs text-red-600">{errors.facultyId.message}</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text">Code</label>
+              <input
+                {...register('code')}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-text focus:border-bbu-blue focus:outline-none"
+                placeholder="CS"
+              />
+              {errors.code && <p className="mt-1 text-xs text-red-600">{errors.code.message}</p>}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text">Name</label>
+              <input
+                {...register('name')}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-text focus:border-bbu-blue focus:outline-none"
+                placeholder="Computer Science"
+              />
+              {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text">Description</label>
+            <textarea
+              {...register('description')}
+              rows={3}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-text focus:border-bbu-blue focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="isActive" {...register('isActive')} className="h-4 w-4 rounded border-gray-300 text-bbu-blue" />
+            <label htmlFor="isActive" className="text-sm text-text">Active</label>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-text hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="inline-flex items-center gap-2 rounded-lg bg-bbu-blue px-4 py-2 text-sm font-medium text-white hover:bg-bbu-blue/90 disabled:opacity-60"
+            >
+              {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {department ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function AdminDepartmentsPage() {
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<Department | null>(null)
+  const [deleting, setDeleting] = useState<Department | null>(null)
+
+  const { faculties } = useAdminFaculties()
+  const {
+    departments,
+    pagination,
+    isLoading,
+    create,
+    isCreating,
+    update,
+    isUpdating,
+    remove,
+    isDeleting,
+  } = useAdminDepartments({ search, page, perPage: 10 })
+
+  async function handleSave(formData: DepartmentFormData) {
+    if (editing) {
+      await update({ id: editing.id, formData })
+    } else {
+      await create(formData)
+    }
+    setModalOpen(false)
+    setEditing(null)
+  }
+
+  async function handleDelete() {
+    if (!deleting) return
+    await remove(deleting.id)
+    setDeleting(null)
+  }
+
+  const facultyById = new Map((faculties ?? []).map((f) => [f.id, f]))
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative max-w-xs">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+            placeholder="Search departments..."
+            className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm text-text focus:border-bbu-blue focus:outline-none"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setEditing(null)
+            setModalOpen(true)
+          }}
+          className="inline-flex items-center gap-2 rounded-lg bg-bbu-blue px-4 py-2 text-sm font-medium text-white hover:bg-bbu-blue/90"
+        >
+          <Plus className="h-4 w-4" />
+          Add Department
+        </button>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+        <table className="min-w-full text-left text-sm">
+          <thead className="border-b border-gray-200 bg-gray-50 text-text-muted">
+            <tr>
+              <th className="px-4 py-3 font-medium">Code</th>
+              <th className="px-4 py-3 font-medium">Name</th>
+              <th className="px-4 py-3 font-medium">Faculty</th>
+              <th className="px-4 py-3 font-medium">Counts</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium">Created</th>
+              <th className="px-4 py-3 text-right font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {isLoading ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-text-muted">
+                  <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+                </td>
+              </tr>
+            ) : departments?.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-text-muted">
+                  No departments found.
+                </td>
+              </tr>
+            ) : (
+              departments?.map((d) => (
+                <tr key={d.id}>
+                  <td className="px-4 py-3 font-medium text-text">{d.code}</td>
+                  <td className="px-4 py-3 text-text">{d.name}</td>
+                  <td className="px-4 py-3 text-text-muted">{facultyById.get(d.facultyId)?.name ?? '-'}</td>
+                  <td className="px-4 py-3 text-text-muted">
+                    {d.usersCount ?? 0} users · {d.coursesCount ?? 0} courses · {d.programsCount ?? 0} programs
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        d.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}
+                    >
+                      {d.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-text-muted">{formatDate(d.createdAt)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditing(d)
+                          setModalOpen(true)
+                        }}
+                        className="rounded p-1 text-text-muted hover:bg-gray-100"
+                        aria-label="Edit"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleting(d)}
+                        className="rounded p-1 text-red-600 hover:bg-red-50"
+                        aria-label="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {pagination && pagination.lastPage > 1 && (
+        <div className="flex items-center justify-between text-sm">
+          <p className="text-text-muted">
+            Showing {pagination.from ?? 0}–{pagination.to ?? 0} of {pagination.total}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="rounded-lg border border-gray-200 p-2 hover:bg-gray-50 disabled:opacity-40"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-text-muted">
+              {page} / {pagination.lastPage}
+            </span>
+            <button
+              type="button"
+              disabled={page >= pagination.lastPage}
+              onClick={() => setPage((p) => p + 1)}
+              className="rounded-lg border border-gray-200 p-2 hover:bg-gray-50 disabled:opacity-40"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {modalOpen && (
+        <DepartmentModal
+          department={editing}
+          onClose={() => {
+            setModalOpen(false)
+            setEditing(null)
+          }}
+          onSave={handleSave}
+          isSaving={isCreating || isUpdating}
+          faculties={faculties ?? []}
+        />
+      )}
+
+      {deleting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
+            <h3 className="text-lg font-semibold text-text">Delete Department?</h3>
+            <p className="mt-2 text-sm text-text-muted">
+              This will permanently remove {deleting.name} ({deleting.code}).
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleting(null)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-text hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
