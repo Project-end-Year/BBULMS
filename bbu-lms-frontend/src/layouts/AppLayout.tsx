@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
+  BarChart3,
 } from 'lucide-react'
 
 import {
@@ -25,8 +26,9 @@ import {
   useListenNotifications,
   notificationTypeLabel,
 } from '@/hooks/useNotifications'
+import { useAuth } from '@/contexts/AuthContext'
 
-const navItems = [
+const baseNavItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/courses', label: 'Courses', icon: BookOpen },
   { to: '/announcements', label: 'Announcements', icon: Megaphone },
@@ -42,6 +44,7 @@ function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const notifRef = useRef<HTMLDivElement>(null)
+  const { user } = useAuth()
 
   const { data: notificationsData, isLoading: notificationsLoading } =
     useNotifications()
@@ -52,6 +55,16 @@ function AppLayout() {
 
   const unreadCount = notificationsData?.unreadCount ?? 0
   const notifications = notificationsData?.notifications ?? []
+
+  const isStudent = user?.roles.some((role) => role.name === 'student') ?? false
+
+  const navItems = [
+    ...baseNavItems.slice(0, 1),
+    ...(isStudent
+      ? [{ to: '/analytics', label: 'Analytics', icon: BarChart3 }]
+      : []),
+    ...baseNavItems.slice(1),
+  ]
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

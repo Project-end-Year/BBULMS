@@ -16,6 +16,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\QuizAttemptController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\ClassScheduleController;
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\DashboardController;
@@ -58,6 +59,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/student', [DashboardController::class, 'student']);
     Route::get('/dashboard/lecturer', [DashboardController::class, 'lecturer']);
     Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
+
+    Route::get('/analytics/student', [AnalyticsController::class, 'student']);
     Route::get('/announcements', [AnnouncementController::class, 'feed']);
 
     Route::get('/calendar', [CalendarEventController::class, 'feed']);
