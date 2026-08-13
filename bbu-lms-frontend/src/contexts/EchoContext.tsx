@@ -75,7 +75,7 @@ export function EchoProvider({ children }: EchoProviderProps) {
     }
 
     return { echo: echoRef.current, connected }
-  }, [])
+  }, [connected])
 
   useEffect(() => {
     return () => {

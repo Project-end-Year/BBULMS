@@ -19,7 +19,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useMyCourses } from '@/hooks/useMyCourses'
 import { useGradeSummary } from '@/hooks/useGradeHistory'
 import { useStudentDashboard, type DashboardAssignment, type DashboardClass, type DashboardExam, type DashboardGrade } from '@/hooks/useStudentDashboard'
-import { StatCard, EmptyState, SectionHeader, formatDueLabel, letterGradeColorClass } from '@/pages/shared/dashboard/DashboardShared'
+import { StatCard, EmptyState, SectionHeader } from '@/pages/shared/dashboard/DashboardShared'
+import { formatDueLabel, letterGradeColorClass } from '@/pages/shared/dashboard/dashboardUtils'
 import { Link } from 'react-router-dom'
 
 function GradeSummaryCard() {

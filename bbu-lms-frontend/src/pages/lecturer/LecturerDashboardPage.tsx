@@ -17,7 +17,8 @@ import { format, parseISO } from 'date-fns'
 import { useAuth } from '@/contexts/AuthContext'
 import { useMyCourses } from '@/hooks/useMyCourses'
 import { useLecturerDashboard, type LecturerDashboardClass, type ActiveAttendanceSession, type DashboardAssignment, type LowPerformer, type CourseAverage } from '@/hooks/useLecturerDashboard'
-import { StatCard, EmptyState, SectionHeader, formatDueLabel } from '@/pages/shared/dashboard/DashboardShared'
+import { StatCard, EmptyState, SectionHeader } from '@/pages/shared/dashboard/DashboardShared'
+import { formatDueLabel } from '@/pages/shared/dashboard/dashboardUtils'
 
 function TodaysClasses({ classes }: { classes: LecturerDashboardClass[] }) {
   return (

@@ -80,6 +80,15 @@ function StudentResultView({
   quiz: Quiz
   isLoading: boolean
 }) {
+  const answers = useMemo(() => {
+    if (!attempt) return {}
+    const map: Record<number, { optionId?: number | null; answerText?: string | null; isCorrect?: boolean | null }> = {}
+    attempt.answers.forEach((a) => {
+      map[a.questionId] = a
+    })
+    return map
+  }, [attempt])
+
   if (isLoading) {
     return (
       <div className="flex min-h-[30vh] items-center justify-center text-text-muted">
@@ -101,14 +110,6 @@ function StudentResultView({
   const maxScore = attempt.attempt.maxScore ?? quiz.totalPoints
   const percentage = attempt.attempt.percentage ?? 0
   const isPassing = quiz.passingScorePercentage != null && percentage >= quiz.passingScorePercentage
-
-  const answers = useMemo(() => {
-    const map: Record<number, { optionId?: number | null; answerText?: string | null; isCorrect?: boolean | null }> = {}
-    attempt.answers.forEach((a) => {
-      map[a.questionId] = a
-    })
-    return map
-  }, [attempt.answers])
 
   const correctCount = quiz.questions.filter((q) => {
     const answer = answers[q.id!]
