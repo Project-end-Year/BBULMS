@@ -56,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/my-courses', [CourseOfferingController::class, 'myCourses']);
     Route::get('/dashboard/student', [DashboardController::class, 'student']);
+    Route::get('/dashboard/lecturer', [DashboardController::class, 'lecturer']);
     Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
     Route::get('/announcements', [AnnouncementController::class, 'feed']);
 
